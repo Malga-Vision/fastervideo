@@ -161,7 +161,7 @@ class DefaultPredictor:
         assert self.input_format in ["RGB", "BGR"], self.input_format
 
     @torch.no_grad()
-    def __call__(self, original_image):
+    def __call__(self, original_image,prop_limit):
         """
         Args:
             original_image (np.ndarray): an image of shape (H, W, C) (in BGR order).
@@ -178,8 +178,10 @@ class DefaultPredictor:
         image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
 
         inputs = {"image": image, "height": height, "width": width}
+        self.model.props_limit=prop_limit
         predictions = self.model([inputs])[0]
         return predictions
+
 
 
 class DefaultTrainer(SimpleTrainer):
