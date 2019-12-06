@@ -121,10 +121,10 @@ class VideoRCNN(nn.Module):
             if self.proposal_generator:
                 props, _ = self.proposal_generator(images, features, None)
                 pprops = props[0]
-                if(self.tracker.frameCount==1):
+                if(len(self.tracker.tracks)):
                     
                     
-                    thresh = pprops[:100]
+                    thresh = pprops[:40]
                 else:
                     
                     thresh = pprops[:4*len(self.tracker.tracks)]
