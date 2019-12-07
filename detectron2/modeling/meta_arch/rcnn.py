@@ -121,7 +121,7 @@ class VideoRCNN(nn.Module):
             if self.proposal_generator:
                 props, _ = self.proposal_generator(images, features, None)
                 pprops = props[0]
-                if(len(self.tracker.tracks)):
+                if(len(self.tracker.tracks)==0):
                     
                     
                     thresh = pprops[:40]
@@ -177,23 +177,13 @@ class VideoRCNN(nn.Module):
                 width = input_per_image.get("width", image_size[1])
                 r = detector_postprocess(results_per_image, height, width)
                 processed_results.append({"instances": r})
-                if(self.tracker.frameCount==1):
-                   
-                    self.tracker.track(r, None,None)
-                    
-                    result= self.tracker.get_display_tracks()
-                    
-                    
-                    r = []
-                    r.append({"instances":result})
-                    return r
-                else:
+                
                     #print('another time, currently there are %d tracks'%len(self.tracker.tracks))
-                    self.tracker.track(r, None,None)
-                    result = self.tracker.get_display_tracks()
-                    r = []
-                    r.append({"instances":result})
-                    return r
+                self.tracker.track(r, None,None)
+                result = self.tracker.get_display_tracks()
+                res = []
+                res.append({"instances":r})
+                return r
                     
                 
             
