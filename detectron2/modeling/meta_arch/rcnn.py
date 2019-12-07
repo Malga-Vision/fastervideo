@@ -127,7 +127,7 @@ class VideoRCNN(nn.Module):
                     thresh = pprops[:40]
                 else:
                     
-                    thresh = pprops[:4*len(self.tracker.tracks)]
+                    thresh = pprops[:2*len(self.tracker.tracks)]
                 dets = []
                 i=0
                 for b in thresh.proposal_boxes:
