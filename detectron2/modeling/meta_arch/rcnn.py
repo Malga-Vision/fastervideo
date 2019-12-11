@@ -35,6 +35,7 @@ class VideoRCNN(nn.Module):
         self.proposal_generator = build_proposal_generator(cfg, self.backbone.output_shape())
         self.roi_heads = build_roi_heads(cfg, self.backbone.output_shape())
         self.tracker = Tracker()
+        self.top_five_logits = []
         assert len(cfg.MODEL.PIXEL_MEAN) == len(cfg.MODEL.PIXEL_STD)
         num_channels = len(cfg.MODEL.PIXEL_MEAN)
         pixel_mean = torch.Tensor(cfg.MODEL.PIXEL_MEAN).to(self.device).view(num_channels, 1, 1)
@@ -121,6 +122,7 @@ class VideoRCNN(nn.Module):
             if self.proposal_generator:
                 props, _ = self.proposal_generator(images, features, None)
                 pprops = props[0]
+               
                 if(len(self.tracker.tracks)==0):
                     
                     
@@ -210,12 +212,12 @@ class GeneralizedRCNN(nn.Module):
 
     def __init__(self, cfg):
         super().__init__()
-
+        self.top_five_logits = []
         self.device = torch.device(cfg.MODEL.DEVICE)
         self.backbone = build_backbone(cfg)
         self.proposal_generator = build_proposal_generator(cfg, self.backbone.output_shape())
         self.roi_heads = build_roi_heads(cfg, self.backbone.output_shape())
-
+        self.test_props = []
         assert len(cfg.MODEL.PIXEL_MEAN) == len(cfg.MODEL.PIXEL_STD)
         num_channels = len(cfg.MODEL.PIXEL_MEAN)
         pixel_mean = torch.Tensor(cfg.MODEL.PIXEL_MEAN).to(self.device).view(num_channels, 1, 1)
@@ -296,6 +298,21 @@ class GeneralizedRCNN(nn.Module):
             if self.proposal_generator:
                 proposals, _ = self.proposal_generator(images, features, None)
                 props = proposals[0]
+                i=0
+                temp = []
+                temp_boxes= []
+                
+                for b in props.proposal_boxes:
+                    
+                    box = b.cpu().numpy()
+                    
+                    temp_boxes.append([box[0],box[1],box[2],box[3]])
+                    temp.append(np.array(props.objectness_logits[i].cpu(),ndmin=1)[0])
+                    i+=1
+                    if(i>10):
+                        break
+                self.test_props.append(temp_boxes)
+                self.top_five_logits.append(temp)
                 proposals = props[:self.props_limit]
                 proposals = [proposals]
             else:
