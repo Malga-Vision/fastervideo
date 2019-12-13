@@ -14,7 +14,7 @@ from ..roi_heads import build_roi_heads
 from detectron2.structures import Instances
 from detectron2.structures import Boxes
 from .build import META_ARCH_REGISTRY
-
+from scipy.cluster.hierarchy import dendrogram, linkage,fcluster
 __all__ = ["GeneralizedRCNN", "ProposalNetwork","VideoRCNN"]
 
 
@@ -218,6 +218,7 @@ class GeneralizedRCNN(nn.Module):
         self.proposal_generator = build_proposal_generator(cfg, self.backbone.output_shape())
         self.roi_heads = build_roi_heads(cfg, self.backbone.output_shape())
         self.test_props = []
+        self.proposals_used = []
         assert len(cfg.MODEL.PIXEL_MEAN) == len(cfg.MODEL.PIXEL_STD)
         num_channels = len(cfg.MODEL.PIXEL_MEAN)
         pixel_mean = torch.Tensor(cfg.MODEL.PIXEL_MEAN).to(self.device).view(num_channels, 1, 1)
@@ -273,7 +274,8 @@ class GeneralizedRCNN(nn.Module):
         losses.update(detector_losses)
         losses.update(proposal_losses)
         return losses
-
+    def center (box):
+        return (box[0] + ((box[2]-box[0])/2), box[1] + ((box[3]-box[1])/2))
     def inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
         """
         Run inference on the given inputs.
@@ -298,23 +300,37 @@ class GeneralizedRCNN(nn.Module):
             if self.proposal_generator:
                 proposals, _ = self.proposal_generator(images, features, None)
                 props = proposals[0]
-                i=0
-                temp = []
-                temp_boxes= []
                 
-                for b in props.proposal_boxes:
-                    
+                proposalss = props[:self.props_limit]
+                centers = []
+                for b in proposalss.proposal_boxes:
                     box = b.cpu().numpy()
-                    
-                    temp_boxes.append([box[0],box[1],box[2],box[3]])
-                    temp.append(np.array(props.objectness_logits[i].cpu(),ndmin=1)[0])
-                    i+=1
-                    if(i>10):
-                        break
-                self.test_props.append(temp_boxes)
-                self.top_five_logits.append(temp)
-                proposals = props[:self.props_limit]
-                proposals = [proposals]
+                    c = center(box)
+                    centers.append(c)
+                Z = linkage(centers, 'ward')
+                centers = np.array(centers)
+                max_d = 250
+                clusters = fcluster(Z, max_d,  criterion='distance')
+                merged = torch.Tensor(len(list(set(clusters))),4)
+                i=0
+                conf_list = []
+                self.proposals_used.append(len(list(set(clusters))))
+                for c in list(set(clusters)):
+                    cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
+                    top = cluster_based[0]
+                    merged[i,:] = top
+                    conf_list.append(proposalss.objectness_logits[np.where(clusters==c)][0])
+                new_proposals = Instances(proposalss._image_size,proposal_boxes = Boxes(merged),objectness_logits = conf_list)
+                 
+                proposals = [new_proposals]
+                for  input_per_image, image_size in zip(
+                batched_inputs, images.image_sizes
+            ):
+                    height = input_per_image.get("height", image_size[0])
+                    width = input_per_image.get("width", image_size[1])
+                    r = detector_postprocess(proposalss, height, width)
+                    self.test_props.append(r)
+                
             else:
                 assert "proposals" in batched_inputs[0]
                 proposals = [x["proposals"].to(self.device) for x in batched_inputs]
@@ -332,6 +348,7 @@ class GeneralizedRCNN(nn.Module):
                 height = input_per_image.get("height", image_size[0])
                 width = input_per_image.get("width", image_size[1])
                 r = detector_postprocess(results_per_image, height, width)
+                
                 processed_results.append({"instances": r})
             return processed_results
         else:
