@@ -161,7 +161,7 @@ class DefaultPredictor:
         assert self.input_format in ["RGB", "BGR"], self.input_format
 
     @torch.no_grad()
-    def __call__(self, original_image,prop_limit):
+    def __call__(self, original_image,prop_limit,max_distance):
         """
         Args:
             original_image (np.ndarray): an image of shape (H, W, C) (in BGR order).
@@ -179,6 +179,7 @@ class DefaultPredictor:
 
         inputs = {"image": image, "height": height, "width": width}
         self.model.props_limit=prop_limit
+        self.model.max_distance = max_distance
         predictions = self.model([inputs])[0]
         return predictions
 

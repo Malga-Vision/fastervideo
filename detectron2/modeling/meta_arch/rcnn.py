@@ -310,8 +310,8 @@ class GeneralizedRCNN(nn.Module):
                     centers.append(c)
                 Z = linkage(centers, 'ward')
                 centers = np.array(centers)
-                max_d = 250
-                clusters = fcluster(Z, max_d,  criterion='distance')
+                
+                clusters = fcluster(Z, self.max_distance,  criterion='distance')
                 merged = torch.Tensor(len(list(set(clusters))),4)
                 i=0
                 conf_list = []
