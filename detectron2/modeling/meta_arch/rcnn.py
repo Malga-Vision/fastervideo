@@ -274,7 +274,7 @@ class GeneralizedRCNN(nn.Module):
         losses.update(detector_losses)
         losses.update(proposal_losses)
         return losses
-    def center (box):
+    def center (self,box):
         return (box[0] + ((box[2]-box[0])/2), box[1] + ((box[3]-box[1])/2))
     def inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
         """
@@ -302,10 +302,11 @@ class GeneralizedRCNN(nn.Module):
                 props = proposals[0]
                 
                 proposalss = props[:self.props_limit]
+                
                 centers = []
                 for b in proposalss.proposal_boxes:
                     box = b.cpu().numpy()
-                    c = center(box)
+                    c = self.center(box)
                     centers.append(c)
                 Z = linkage(centers, 'ward')
                 centers = np.array(centers)
@@ -318,10 +319,16 @@ class GeneralizedRCNN(nn.Module):
                 for c in list(set(clusters)):
                     cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
                     top = cluster_based[0]
-                    merged[i,:] = top
-                    conf_list.append(proposalss.objectness_logits[np.where(clusters==c)][0])
-                new_proposals = Instances(proposalss._image_size,proposal_boxes = Boxes(merged),objectness_logits = conf_list)
-                 
+                    merged[i,:] = top.to('cuda')
+                    conf_temp = proposalss.objectness_logits[np.where(clusters==c)][0]
+                    conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
+                    i+=1
+                conf_cuda = torch.from_numpy(np.array(conf_list)).float().to('cuda')
+                
+                new_proposals = Instances(proposalss._image_size,
+                proposal_boxes = Boxes(merged.to('cuda')),
+                objectness_logits = conf_cuda)
+                
                 proposals = [new_proposals]
                 for  input_per_image, image_size in zip(
                 batched_inputs, images.image_sizes
