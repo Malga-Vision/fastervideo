@@ -276,6 +276,24 @@ class GeneralizedRCNN(nn.Module):
         return losses
     def center (self,box):
         return (box[0] + ((box[2]-box[0])/2), box[1] + ((box[3]-box[1])/2))
+    def aspect_ratio(self,box):
+        return (box[2]-box[0])/(box[3]-box[1])
+    def center_and_aspect(self,box):
+        c = self.center(box)
+        return (c[0],c[1],self.aspect_ratio(box))
+    def cluster(self,boxes):
+        clusters = []
+        centers = []
+        for b in boxes.proposal_boxes:
+            box = b.cpu().numpy()
+            c = self.center_and_aspect(box)
+            centers.append(c)
+            Z = linkage(centers, 'ward')
+        centers = np.array(centers)
+                
+        clusters = fcluster(Z, self.max_distance,  criterion='distance')
+        
+        return clusters
     def inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
         """
         Run inference on the given inputs.
@@ -303,15 +321,11 @@ class GeneralizedRCNN(nn.Module):
                 
                 proposalss = props[:self.props_limit]
                 
-                centers = []
-                for b in proposalss.proposal_boxes:
-                    box = b.cpu().numpy()
-                    c = self.center(box)
-                    centers.append(c)
-                Z = linkage(centers, 'ward')
-                centers = np.array(centers)
                 
-                clusters = fcluster(Z, self.max_distance,  criterion='distance')
+                clusters =  self.cluster(proposalss.proposal_boxes)
+                    
+                
+               
                 merged = torch.Tensor(len(list(set(clusters))),4)
                 i=0
                 conf_list = []
