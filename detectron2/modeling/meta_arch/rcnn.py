@@ -278,16 +278,19 @@ class GeneralizedRCNN(nn.Module):
         return (box[0] + ((box[2]-box[0])/2), box[1] + ((box[3]-box[1])/2))
     def aspect_ratio(self,box):
         return (box[2]-box[0])/(box[3]-box[1])
-    def center_and_aspect(self,box):
+    def center_and_aspect(self,box,size):
         c = self.center(box)
-        return (c[0],c[1],self.aspect_ratio(box))
-    def cluster(self,boxes):
+        return (c[0]/size[1],c[1]/size[0],self.aspect_ratio(box))
+    def cluster(self,boxes,size):
         clusters = []
         centers = []
+        
+        
         for b in boxes:
             box = b.cpu().numpy()
-            c = self.center_and_aspect(box)
+            c = self.center_and_aspect(box,size)
             centers.append(c)
+            
         Z= linkage(centers, 'ward')
         centers = np.array(centers)
                 
@@ -322,7 +325,7 @@ class GeneralizedRCNN(nn.Module):
                 proposalss = props[:self.props_limit]
                 
                 
-                clusters =  self.cluster(proposalss.proposal_boxes)
+                clusters =  self.cluster(proposalss.proposal_boxes,proposalss._image_size)
                     
                 
                 result_dim = 0
@@ -347,10 +350,10 @@ class GeneralizedRCNN(nn.Module):
                         i+=1
                         merged[i,:] = second_top.to('cuda')
                         conf_temp = proposalss.objectness_logits[np.where(clusters==c)][1]
-                        conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[1])
+                        conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
                    
                     i+=1
-                print(merged);
+                
                 conf_cuda = torch.from_numpy(np.array(conf_list)).float().to('cuda')
                 
                 new_proposals = Instances(proposalss._image_size,
