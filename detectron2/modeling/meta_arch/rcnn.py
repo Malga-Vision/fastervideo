@@ -284,11 +284,11 @@ class GeneralizedRCNN(nn.Module):
     def cluster(self,boxes):
         clusters = []
         centers = []
-        for b in boxes.proposal_boxes:
+        for b in boxes:
             box = b.cpu().numpy()
             c = self.center_and_aspect(box)
             centers.append(c)
-            Z = linkage(centers, 'ward')
+        Z= linkage(centers, 'ward')
         centers = np.array(centers)
                 
         clusters = fcluster(Z, self.max_distance,  criterion='distance')
@@ -325,8 +325,14 @@ class GeneralizedRCNN(nn.Module):
                 clusters =  self.cluster(proposalss.proposal_boxes)
                     
                 
-               
-                merged = torch.Tensor(len(list(set(clusters))),4)
+                result_dim = 0
+                for c in list(set(clusters)):
+                    cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
+                    if(len(cluster_based)>1):
+                        result_dim+=2
+                    else:
+                        result_dim+=1
+                merged = torch.Tensor(result_dim,4)
                 i=0
                 conf_list = []
                 self.proposals_used.append(len(list(set(clusters))))
@@ -336,7 +342,15 @@ class GeneralizedRCNN(nn.Module):
                     merged[i,:] = top.to('cuda')
                     conf_temp = proposalss.objectness_logits[np.where(clusters==c)][0]
                     conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
+                    if(len(cluster_based)>1):
+                        second_top= cluster_based[1]
+                        i+=1
+                        merged[i,:] = second_top.to('cuda')
+                        conf_temp = proposalss.objectness_logits[np.where(clusters==c)][1]
+                        conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[1])
+                   
                     i+=1
+                print(merged);
                 conf_cuda = torch.from_numpy(np.array(conf_list)).float().to('cuda')
                 
                 new_proposals = Instances(proposalss._image_size,
