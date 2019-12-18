@@ -121,7 +121,7 @@ def inference_on_dataset(model, data_loader, evaluator):
             torch.cuda.synchronize()
             total_compute_time += time.time() - start_compute_time
             evaluator.process(inputs, outputs)
-
+            print('processed')
             if (idx + 1) % logging_interval == 0:
                 duration = time.time() - start_time
                 seconds_per_img = duration / (idx + 1 - num_warmup)
