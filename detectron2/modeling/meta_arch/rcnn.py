@@ -313,7 +313,7 @@ class GeneralizedRCNN(nn.Module):
             same as in :meth:`forward`.
         """
         assert not self.training
-
+        print(len(batched_inputs))
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
 

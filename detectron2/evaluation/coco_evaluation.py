@@ -144,7 +144,7 @@ class COCOEvaluator(DatasetEvaluator):
                 v: k for k, v in self._metadata.thing_dataset_id_to_contiguous_id.items()
             }
             for result in self._coco_results:
-                result["category_id"] = reverse_id_mapping[result["category_id"]]
+                result["category_id"] = result["category_id"]+1#reverse_id_mapping[result["category_id"]]
 
         if self._output_dir:
             file_path = os.path.join(self._output_dir, "coco_instances_results.json")
@@ -466,7 +466,10 @@ def _evaluate_predictions_on_coco(coco_gt, coco_results, iou_type, kpt_oks_sigma
             c.pop("bbox", None)
 
     coco_dt = coco_gt.loadRes(coco_results)
+    imgIds=sorted(sorted(coco_gt.getImgIds()))
+    imgIds=imgIds[0:500]
     coco_eval = COCOeval(coco_gt, coco_dt, iou_type)
+    coco_eval.params.imgIds  = imgIds
     # Use the COCO default keypoint OKS sigmas unless overrides are specified
     if kpt_oks_sigmas:
         coco_eval.params.kpt_oks_sigmas = np.array(kpt_oks_sigmas)

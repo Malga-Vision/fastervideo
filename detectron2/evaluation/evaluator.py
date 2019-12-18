@@ -111,17 +111,19 @@ def inference_on_dataset(model, data_loader, evaluator):
     start_time = time.time()
     total_compute_time = 0
     with inference_context(model), torch.no_grad():
+        counter =0
         for idx, inputs in enumerate(data_loader):
             if idx == num_warmup:
                 start_time = time.time()
                 total_compute_time = 0
 
             start_compute_time = time.time()
+            print(inputs.shape)
             outputs = model(inputs)
             torch.cuda.synchronize()
             total_compute_time += time.time() - start_compute_time
             evaluator.process(inputs, outputs)
-            print('processed')
+            
             if (idx + 1) % logging_interval == 0:
                 duration = time.time() - start_time
                 seconds_per_img = duration / (idx + 1 - num_warmup)
@@ -133,6 +135,9 @@ def inference_on_dataset(model, data_loader, evaluator):
                         idx + 1, total, seconds_per_img, str(eta)
                     )
                 )
+            counter+=1
+            if(counter>500):
+                break
 
     # Measure the time only for this worker (before the synchronization barrier)
     total_time = int(time.time() - start_time)
