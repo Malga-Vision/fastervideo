@@ -144,7 +144,7 @@ class COCOEvaluator(DatasetEvaluator):
                 v: k for k, v in self._metadata.thing_dataset_id_to_contiguous_id.items()
             }
             for result in self._coco_results:
-                result["category_id"] = result["category_id"]+1#reverse_id_mapping[result["category_id"]]
+                result["category_id"] = reverse_id_mapping[result["category_id"]]
 
         if self._output_dir:
             file_path = os.path.join(self._output_dir, "coco_instances_results.json")
