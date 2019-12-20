@@ -349,7 +349,7 @@ class GeneralizedRCNN(nn.Module):
             same as in :meth:`forward`.
         """
         assert not self.training
-        print(len(batched_inputs))
+        
         images = self.preprocess_image(batched_inputs)
         features = self.backbone(images.tensor)
 
@@ -359,6 +359,7 @@ class GeneralizedRCNN(nn.Module):
                 props = proposals[0]
                 
                 proposalss = props[:self.props_limit]
+                print(proposalss)
                 sel_props = []
                 if(self.enable_clustering==True):
                     sel_props = [self.get_proposals_by_cluster(proposalss)]
