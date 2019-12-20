@@ -297,6 +297,42 @@ class GeneralizedRCNN(nn.Module):
         clusters = fcluster(Z, self.max_distance,  criterion='distance')
         
         return clusters
+    def get_proposals_by_cluster(self,proposalss):
+        clusters =  self.cluster(proposalss.proposal_boxes,proposalss._image_size)
+                    
+        
+        result_dim = 0
+        for c in list(set(clusters)):
+            cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
+            if(len(cluster_based)>1):
+                result_dim+=2
+            else:
+                result_dim+=1
+        merged = torch.Tensor(result_dim,4)
+        i=0
+        conf_list = []
+        self.proposals_used.append(len(list(set(clusters))))
+        for c in list(set(clusters)):
+            cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
+            top = cluster_based[0]
+            merged[i,:] = top.to('cuda')
+            conf_temp = proposalss.objectness_logits[np.where(clusters==c)][0]
+            conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
+            if(len(cluster_based)>1):
+                second_top= cluster_based[1]
+                i+=1
+                merged[i,:] = second_top.to('cuda')
+                conf_temp = proposalss.objectness_logits[np.where(clusters==c)][1]
+                conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
+           
+            i+=1
+        
+        conf_cuda = torch.from_numpy(np.array(conf_list)).float().to('cuda')
+        
+        new_proposals = Instances(proposalss._image_size,
+        proposal_boxes = Boxes(merged.to('cuda')),
+        objectness_logits = conf_cuda)
+        return new_proposals
     def inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
         """
         Run inference on the given inputs.
@@ -323,57 +359,17 @@ class GeneralizedRCNN(nn.Module):
                 props = proposals[0]
                 
                 proposalss = props[:self.props_limit]
-                
-                
-                clusters =  self.cluster(proposalss.proposal_boxes,proposalss._image_size)
-                    
-                
-                result_dim = 0
-                for c in list(set(clusters)):
-                    cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
-                    if(len(cluster_based)>1):
-                        result_dim+=2
-                    else:
-                        result_dim+=1
-                merged = torch.Tensor(result_dim,4)
-                i=0
-                conf_list = []
-                self.proposals_used.append(len(list(set(clusters))))
-                for c in list(set(clusters)):
-                    cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
-                    top = cluster_based[0]
-                    merged[i,:] = top.to('cuda')
-                    conf_temp = proposalss.objectness_logits[np.where(clusters==c)][0]
-                    conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
-                    if(len(cluster_based)>1):
-                        second_top= cluster_based[1]
-                        i+=1
-                        merged[i,:] = second_top.to('cuda')
-                        conf_temp = proposalss.objectness_logits[np.where(clusters==c)][1]
-                        conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
-                   
-                    i+=1
-                
-                conf_cuda = torch.from_numpy(np.array(conf_list)).float().to('cuda')
-                
-                new_proposals = Instances(proposalss._image_size,
-                proposal_boxes = Boxes(merged.to('cuda')),
-                objectness_logits = conf_cuda)
-                
-                proposals = [new_proposals]
-                for  input_per_image, image_size in zip(
-                batched_inputs, images.image_sizes
-            ):
-                    height = input_per_image.get("height", image_size[0])
-                    width = input_per_image.get("width", image_size[1])
-                    r = detector_postprocess(proposalss, height, width)
-                    self.test_props.append(r)
+                sel_props = []
+                if(self.enable_clustering==True):
+                    sel_props = [self.get_proposals_by_cluster(proposalss)]
+                else:
+                    sel_props = [proposalss]
                 
             else:
                 assert "proposals" in batched_inputs[0]
                 proposals = [x["proposals"].to(self.device) for x in batched_inputs]
 
-            results, _ = self.roi_heads(images, features, proposals, None)
+            results, _ = self.roi_heads(images, features, sel_props, None)
         else:
             detected_instances = [x.to(self.device) for x in detected_instances]
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
