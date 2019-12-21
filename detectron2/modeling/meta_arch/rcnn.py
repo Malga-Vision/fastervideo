@@ -359,7 +359,7 @@ class GeneralizedRCNN(nn.Module):
                 props = proposals[0]
                 
                 proposalss = props[:self.props_limit]
-                print(proposalss)
+                
                 sel_props = []
                 if(self.enable_clustering==True):
                     sel_props = [self.get_proposals_by_cluster(proposalss)]
