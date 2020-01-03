@@ -15,6 +15,7 @@ from detectron2.structures import Instances
 from detectron2.structures import Boxes
 from .build import META_ARCH_REGISTRY
 from scipy.cluster.hierarchy import dendrogram, linkage,fcluster
+from sklearn.preprocessing import normalize
 __all__ = ["GeneralizedRCNN", "ProposalNetwork","VideoRCNN"]
 
 
@@ -281,9 +282,9 @@ class GeneralizedRCNN(nn.Module):
     def norm_center(self,box,size):
         c = self.center(box)
         return (c[0]/size[1],c[1]/size[0])
-    def norm_center_norm_aspect(self,box,size):
+    def norm_center_norm_aspect(self,box,size,norm_factor):
         c = self.center(box)
-        return (c[0]/size[1],c[1]/size[0],self.aspect_ratio(box)/4)
+        return (c[0]/size[1],c[1]/size[0],self.aspect_ratio(box)/norm_factor)
     def norm_center_aspect(self,box,size):
         c = self.center(box)
         return (c[0]/size[1],c[1]/size[0],self.aspect_ratio(box))
@@ -292,7 +293,12 @@ class GeneralizedRCNN(nn.Module):
     def cluster(self,boxes,size):
         clusters = []
         centers = []
-        
+        ars = []
+        if(self.cluster_rep =='n_c_n_a'):
+            for b in boxes:
+                box = b.cpu().numpy()
+                ars.append(self.aspect_ratio(box))
+        norm_factor = np.linalg.norm(ars)
         
         for b in boxes:
             box = b.cpu().numpy()
@@ -301,7 +307,7 @@ class GeneralizedRCNN(nn.Module):
             elif(self.cluster_rep=='n_c_a'):
                 c = self.norm_center_aspect(box,size)
             elif(self.cluster_rep=='n_c_n_a'):
-                c= self.norm_center_norm_aspect(box,size)
+                c= self.norm_center_norm_aspect(box,size,norm_factor)
             elif(self.cluster_rep=='n_b'):
                 c = self.norm_bbox(box,size)
             centers.append(c)
