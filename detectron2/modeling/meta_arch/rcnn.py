@@ -278,9 +278,17 @@ class GeneralizedRCNN(nn.Module):
         return (box[0] + ((box[2]-box[0])/2), box[1] + ((box[3]-box[1])/2))
     def aspect_ratio(self,box):
         return (box[2]-box[0])/(box[3]-box[1])
-    def center_and_aspect(self,box,size):
+    def norm_center(self,box,size):
+        c = self.center(box)
+        return (c[0]/size[1],c[1]/size[0])
+    def norm_center_norm_aspect(self,box,size):
+        c = self.center(box)
+        return (c[0]/size[1],c[1]/size[0],self.aspect_ratio(box)/4)
+    def norm_center_aspect(self,box,size):
         c = self.center(box)
         return (c[0]/size[1],c[1]/size[0],self.aspect_ratio(box))
+    def norm_bbox(self,box,size):
+        return (box[0]/size[1],box[2]/size[1],box[1]/size[0],box[3]/size[0])
     def cluster(self,boxes,size):
         clusters = []
         centers = []
@@ -288,7 +296,14 @@ class GeneralizedRCNN(nn.Module):
         
         for b in boxes:
             box = b.cpu().numpy()
-            c = self.center_and_aspect(box,size)
+            if(self.cluster_rep=='n_c'):
+                c = self.norm_center(box,size)
+            elif(self.cluster_rep=='n_c_a'):
+                c = self.norm_center_aspect(box,size)
+            elif(self.cluster_rep=='n_c_n_a'):
+                c= self.norm_center_norm_aspect(box,size)
+            elif(self.cluster_rep=='n_b'):
+                c = self.norm_bbox(box,size)
             centers.append(c)
             
         Z= linkage(centers, 'ward')
@@ -304,10 +319,10 @@ class GeneralizedRCNN(nn.Module):
         result_dim = 0
         for c in list(set(clusters)):
             cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
-            if(len(cluster_based)>1):
-                result_dim+=2
-            else:
-                result_dim+=1
+            #if(len(cluster_based)>1):
+                #result_dim+=2
+            #else:
+            result_dim+=1
         merged = torch.Tensor(result_dim,4)
         i=0
         conf_list = []
@@ -318,12 +333,12 @@ class GeneralizedRCNN(nn.Module):
             merged[i,:] = top.to('cuda')
             conf_temp = proposalss.objectness_logits[np.where(clusters==c)][0]
             conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
-            if(len(cluster_based)>1):
-                second_top= cluster_based[1]
-                i+=1
-                merged[i,:] = second_top.to('cuda')
-                conf_temp = proposalss.objectness_logits[np.where(clusters==c)][1]
-                conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
+            #if(len(cluster_based)>1):
+                #second_top= cluster_based[1]
+                #i+=1
+                #merged[i,:] = second_top.to('cuda')
+                #conf_temp = proposalss.objectness_logits[np.where(clusters==c)][1]
+                #conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
            
             i+=1
         
@@ -359,7 +374,7 @@ class GeneralizedRCNN(nn.Module):
                 props = proposals[0]
                 
                 proposalss = props[:self.props_limit]
-                
+                #self.test_props.append(detector_postprocess(proposalss,batched_inputs[0]['height'],batched_inputs[0]['width']))
                 sel_props = []
                 if(self.enable_clustering==True):
                     sel_props = [self.get_proposals_by_cluster(proposalss)]
