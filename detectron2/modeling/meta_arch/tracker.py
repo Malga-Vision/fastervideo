@@ -89,7 +89,7 @@ class Tracker(object):
             xmax = dets_tensor.pred_boxes[int(i)].tensor[0,2].numpy()
             ymax = dets_tensor.pred_boxes[int(i)].tensor[0,3].numpy()
             
-            dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1))+1))
+            dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1))))
        
         list_classes = [d.pred_class for d in dets]
         list_classes_tracks = [d.pred_class for d in self.tracks]
@@ -137,18 +137,19 @@ class Tracker(object):
         
         
         self.tracks = [track for track in self.tracks if track.conf>=0 and track.missed_count<5]
-        track_boxes =  np.array([[t.xmin,t.ymin,t.xmax,t.ymax] for t in self.tracks if t.tracked_count>3])
-        track_scores = np.array([t.conf for  t in self.tracks if t.tracked_count>3])
-        track_classes = np.array([t.pred_class for t in self.tracks if t.tracked_count>3])
-            
-        boxes_tensor = torch.from_numpy(track_boxes).float()
+#        track_boxes =  np.array([[t.xmin,t.ymin,t.xmax,t.ymax] for t in self.tracks if t.tracked_count>3])
+#        track_scores = np.array([t.conf for  t in self.tracks if t.tracked_count>3])
+#        track_classes = np.array([t.pred_class for t in self.tracks if t.tracked_count>3])
+#            
+#        boxes_tensor = torch.from_numpy(track_boxes).float()
+#        
+#        scores_tensor = torch.from_numpy(track_scores).float()
+#        
+#        classes_tensor = torch.from_numpy(track_classes).float()
+#        res = Instances(self.image_size,pred_boxes = Boxes(boxes_tensor), scores = scores_tensor, pred_classes=classes_tensor)
+#        return res
+        return [track for track in self.tracks if track.conf>=0 and track.missed_count<3]
         
-        scores_tensor = torch.from_numpy(track_scores).float()
         
-        classes_tensor = torch.from_numpy(track_classes).float()
-        res = Instances(self.image_size,pred_boxes = Boxes(boxes_tensor), scores = scores_tensor, pred_classes=classes_tensor)
-        
-        
-        return res
    
        

@@ -1,6 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import torch
-
+import numpy as np
 
 class Matcher(object):
     """
@@ -86,10 +86,21 @@ class Matcher(object):
         matched_vals, matches = match_quality_matrix.max(dim=0)
 
         match_labels = matches.new_full(matches.size(), 1, dtype=torch.int8)
-
+        
+        ## original
         for (l, low, high) in zip(self.labels, self.thresholds[:-1], self.thresholds[1:]):
-            low_high = (matched_vals >= low) & (matched_vals < high)
-            match_labels[low_high] = l
+             low_high = (matched_vals >= low) & (matched_vals < high)
+             match_labels[low_high] = l
+             
+        ##modified
+        #for (l, low, high) in zip(self.labels, self.thresholds[:-1], self.thresholds[1:]):
+        #   if(l==1):
+        #       for gt_index in np.range(match_quality_matrix.shape[0]):
+        #           low_high = ((matched_vals>=low) & (matched_vals<high) & (matches==gt_index))[0]
+#                   match_labels[low_high] = l
+#            else:
+#                low_high = (matched_vals >= low) & (matched_vals < high)
+#                match_labels[low_high] = l
 
         if self.allow_low_quality_matches:
             self.set_low_quality_matches_(match_labels, match_quality_matrix)
