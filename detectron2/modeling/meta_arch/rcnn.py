@@ -138,7 +138,7 @@ class VideoRCNN(nn.Module):
                   bcpu = b.cpu().numpy()
                   conf = np.array(thresh.objectness_logits[i].cpu(),ndmin=1)[0]
                   dets.append(Detection(conf,[bcpu[0],bcpu[1],bcpu[2],bcpu[3]],0))
-                adds = self.tracker.get_predicted_tracks(dets,None,None)
+                adds = self.tracker.get_predicted_tracks(None,None)
                 
                 props_boxes = thresh.proposal_boxes.tensor
                 prop_scores = thresh.objectness_logits
