@@ -180,7 +180,7 @@ class DefaultPredictor:
         inputs = {"image": image, "height": height, "width": width}
         self.model.props_limit=prop_limit
         self.model.max_distance = max_distance
-        predictions = self.model([inputs])[0]
+        predictions = self.model([inputs])
         return predictions
 
 

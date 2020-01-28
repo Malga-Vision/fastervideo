@@ -36,6 +36,7 @@ class VideoRCNN(nn.Module):
         self.proposal_generator = build_proposal_generator(cfg, self.backbone.output_shape())
         self.roi_heads = build_roi_heads(cfg, self.backbone.output_shape())
         self.tracker = Tracker()
+        self.proposals_used = []
         self.top_five_logits = []
         assert len(cfg.MODEL.PIXEL_MEAN) == len(cfg.MODEL.PIXEL_STD)
         num_channels = len(cfg.MODEL.PIXEL_MEAN)
@@ -124,23 +125,23 @@ class VideoRCNN(nn.Module):
                 props, _ = self.proposal_generator(images, features, None)
                 pprops = props[0]
                
-                if(len(self.tracker.tracks)==0):
+                #if(len(self.tracker.tracks)==0):
                     
                     
-                    thresh = pprops[:40]
-                else:
+                thresh = pprops[:self.props_limit]
+                #else:
                     
-                    thresh = pprops[:2*len(self.tracker.tracks)]
+                #    thresh = pprops[:2*len(self.tracker.tracks)]
                 dets = []
                 i=0
                 for b in thresh.proposal_boxes:
                   bcpu = b.cpu().numpy()
                   conf = np.array(thresh.objectness_logits[i].cpu(),ndmin=1)[0]
                   dets.append(Detection(conf,[bcpu[0],bcpu[1],bcpu[2],bcpu[3]],0))
-                inds,adds = self.tracker.filter_proposals(dets,None,None)
+                adds = self.tracker.get_predicted_tracks(dets,None,None)
                 
-                props_boxes = thresh.proposal_boxes[inds].tensor
-                prop_scores = thresh.objectness_logits[inds]
+                props_boxes = thresh.proposal_boxes.tensor
+                prop_scores = thresh.objectness_logits
 
                 track_boxes =  np.array([t[1:5] for t in adds])
                 #track_boxes = np.array([[1,2,3,4],[5,6,7,8]])
@@ -183,10 +184,8 @@ class VideoRCNN(nn.Module):
                 
                     #print('another time, currently there are %d tracks'%len(self.tracker.tracks))
                 self.tracker.track(r, None,None)
-                result = self.tracker.get_display_tracks()
-                res = []
-                res.append({"instances":r})
-                return r
+                return self.tracker.get_display_tracks()
+                
                     
                 
             

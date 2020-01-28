@@ -45,7 +45,14 @@ class Tracker(object):
                 
                 #dists[ipred,itrack] = ((1-iou_overlap)+desc_dist)
         return dists
-   
+    def get_predicted_tracks(self,frame_gray,prev_frame_gray):
+        adds = []
+        for t,trk in enumerate(self.tracks):
+            
+            trk.predict(None,None)
+                
+            adds.append([trk.conf,trk.pred_xmin,trk.pred_ymin,trk.pred_xmax,trk.pred_ymax])
+        return adds
     def filter_proposals(self,dets,frame_gray,prev_frame_gray):
         dists = self.get_distance_matrix(dets,[t for t in self.tracks if t.tracked_count>3] ,frame_gray)
         
