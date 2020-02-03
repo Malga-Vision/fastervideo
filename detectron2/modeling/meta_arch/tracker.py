@@ -35,7 +35,7 @@ class Tracker(object):
         for itrack in range(len(tracks)):
             for ipred in range(len(dets)):
                 
-                #desc_dist = np.linalg.norm(dets[ipred].hog-self.tracks[itrack].hog,ord=1)
+                desc_dist = np.linalg.norm(dets[ipred].descriptor-self.tracks[itrack].descriptor,ord=1)
                 
                 iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
               
@@ -82,9 +82,10 @@ class Tracker(object):
                 trk.update(dets[np.where(c==t)[0][0]],None,None)
         return inds,adds
                  
-    def track(self,dets_tensor,frame_gray,prev_frame_gray):
+    def track(self,dets_tensor,descs_tensor ,frame_gray,prev_frame_gray):
         
         dets_tensor = dets_tensor.to('cpu')
+        descs_tensor = descs_tensor.to('cpu')
         self.image_size = dets_tensor._image_size
         dets = []
         missed_tracks = 0
@@ -96,7 +97,7 @@ class Tracker(object):
             xmax = dets_tensor.pred_boxes[int(i)].tensor[0,2].numpy()
             ymax = dets_tensor.pred_boxes[int(i)].tensor[0,3].numpy()
             
-            dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1))))
+            dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i]))
        
         list_classes = [d.pred_class for d in dets]
         list_classes_tracks = [d.pred_class for d in self.tracks]

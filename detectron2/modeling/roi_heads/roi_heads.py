@@ -421,6 +421,13 @@ class Res5ROIHeads(ROIHeads):
                 self.test_score_thresh, self.test_nms_thresh, self.test_detections_per_img
             )
             pred_instances = self.forward_with_given_boxes(features, pred_instances)
+            pred_boxes = [x.pred_boxes for x in pred_instances]
+            box_features = self._shared_roi_transform(
+            [features[f] for f in self.in_features], pred_boxes
+        )
+            feature_pooled = box_features.mean(dim=[2, 3])  # pooled to 1x1
+            print(feature_pooled.shape)
+            
             return pred_instances, {}
 
     def forward_with_given_boxes(self, features, instances):
