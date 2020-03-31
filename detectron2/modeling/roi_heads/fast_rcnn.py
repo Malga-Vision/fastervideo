@@ -196,7 +196,9 @@ class FastRCNNOutputs(object):
             scalar Tensor
         """
         self._log_accuracy()
-        return F.cross_entropy(self.pred_class_logits, self.gt_classes, reduction="mean")
+        #weights = [10,20,1,1]
+        #class_weights = torch.FloatTensor(weights).cuda()
+        return F.cross_entropy(self.pred_class_logits, self.gt_classes, reduction="mean")#,weight=class_weights)
 
     def smooth_l1_loss(self):
         """

@@ -385,12 +385,16 @@ class Res5ROIHeads(ROIHeads):
         del targets
 
         proposal_boxes = [x.proposal_boxes for x in proposals]
+        #print(proposal_boxes)
         box_features = self._shared_roi_transform(
             [features[f] for f in self.in_features], proposal_boxes
         )
+        #print(box_features.shape)
         feature_pooled = box_features.mean(dim=[2, 3])  # pooled to 1x1
+        #print(feature_pooled.shape)
         pred_class_logits, pred_proposal_deltas = self.box_predictor(feature_pooled)
         del feature_pooled
+
 
         outputs = FastRCNNOutputs(
             self.box2box_transform,
@@ -420,15 +424,20 @@ class Res5ROIHeads(ROIHeads):
             pred_instances, _ = outputs.inference(
                 self.test_score_thresh, self.test_nms_thresh, self.test_detections_per_img
             )
+            #print(pred_instances)
             pred_instances = self.forward_with_given_boxes(features, pred_instances)
+            #print(pred_instances)
             pred_boxes = [x.pred_boxes for x in pred_instances]
+            #print(pred_boxes)
             box_features = self._shared_roi_transform(
             [features[f] for f in self.in_features], pred_boxes
         )
-            feature_pooled = box_features.mean(dim=[2, 3])  # pooled to 1x1
-            print(feature_pooled.shape)
             
-            return pred_instances, {}
+            feature_pooled = box_features.mean(dim=[2, 3])  # pooled to 1x1
+            
+            
+            
+            return pred_instances,feature_pooled
 
     def forward_with_given_boxes(self, features, instances):
         """
@@ -572,11 +581,11 @@ class StandardROIHeads(ROIHeads):
             losses.update(self._forward_keypoint(features_list, proposals))
             return proposals, losses
         else:
-            pred_instances = self._forward_box(features_list, proposals)
+            pred_instances,desc = self._forward_box(features_list, proposals)
             # During inference cascaded prediction is used: the mask and keypoints heads are only
             # applied to the top scoring box detections.
             pred_instances = self.forward_with_given_boxes(features, pred_instances)
-            return pred_instances, {}
+            return pred_instances, desc
 
     def forward_with_given_boxes(self, features, instances):
         """
@@ -622,7 +631,7 @@ class StandardROIHeads(ROIHeads):
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
         box_features = self.box_head(box_features)
         pred_class_logits, pred_proposal_deltas = self.box_predictor(box_features)
-        del box_features
+        
 
         outputs = FastRCNNOutputs(
             self.box2box_transform,
@@ -637,7 +646,7 @@ class StandardROIHeads(ROIHeads):
             pred_instances, _ = outputs.inference(
                 self.test_score_thresh, self.test_nms_thresh, self.test_detections_per_img
             )
-            return pred_instances
+            return pred_instances,box_features
 
     def _forward_mask(self, features, instances):
         """
