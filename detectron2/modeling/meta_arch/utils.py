@@ -121,6 +121,7 @@ def iou(a, b):
 	iou = area_overlap / (area_combined+epsilon)
 	return iou    
 def get_hog_descriptor(frame,xmin,ymin,xmax,ymax):
+    
     if(xmin<0):
         xmin = 0
     if(ymin<0):
@@ -129,7 +130,7 @@ def get_hog_descriptor(frame,xmin,ymin,xmax,ymax):
         xmax=0
     if(ymax<0):
         ymax=0
-   
+    
     section = frame[int(ymin):int(ymax),int(xmin):int(xmax)]
     if(section.shape[0]==0 or section.shape[1]==0):
         return np.zeros(9)

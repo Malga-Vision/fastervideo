@@ -17,7 +17,7 @@ class Track(Detection):
         self.pred_xmax = det.xmax
         self.pred_ymax = det.ymax
         self.tracked_count = 1
-        
+        self.hog = det.hog
         
         self.centers= []
         self.areas = []
@@ -128,7 +128,7 @@ class Track(Detection):
         ymin = self.ymin
         ymax = self.ymax
         
-        other = Track(self.track_id,np.array([0,self.conf,xmin,ymin,xmax,ymax],np.float32),self.descriptor)
+        other = Track(self.track_id,np.array([0,self.conf,xmin,ymin,xmax,ymax],np.float32),None)
         other.tracked_count = self.tracked_count
         other.missed_count = self.missed_count
         other.matched = self.matched
@@ -142,7 +142,8 @@ class Track(Detection):
         self.matched = True
         self.missed_count = 0
         self.tracked_count +=1
-        
+        self.descriptor = det.descriptor
+        self.hog= det.hog
         if(self.tracked_count>3):
             self.conf = np.maximum(det.conf,0.5)
         else:

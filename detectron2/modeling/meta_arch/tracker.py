@@ -26,39 +26,62 @@ class Tracker(object):
         self.frameCount =1
         self.detect_interval=3
         self.track_len = 10
+        self.distances = []
         self.feature_params=dict(maxCorners=200,qualityLevel=0.3,minDistance=7,blockSize=7)
         self.lk_params=dict(winSize=(15,15),maxLevel=2,criteria=(cv.TERM_CRITERIA_EPS|cv.TERM_CRITERIA_COUNT,10,0.03))
         self.flow_time=0
+    def get_simple_distance_matrix(self,dets,tracks,frame):
+        dists = np.zeros((len(dets),len(tracks)),np.float32)
+        for itrack in range(len(tracks)):
+            for ipred in range(len(dets)):
+                
+                iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
+                iou_dist = 1-iou_overlap
+               
+                dists[ipred,itrack] = iou_dist
+            
+                
+                #dists[ipred,itrack] = ((1-iou_overlap)+desc_dist)
+        return dists
     def get_distance_matrix(self,dets,tracks,frame):
         
         dists = np.zeros((len(dets),len(tracks)),np.float32)
         for itrack in range(len(tracks)):
             for ipred in range(len(dets)):
-                
-                desc_dist = np.linalg.norm(dets[ipred].descriptor-self.tracks[itrack].descriptor,ord=1)
+                desc_dist=0
+                if(self.use_appearance==True):
+                    if(self.use_embed==True):
+                        desc_dist = np.linalg.norm(dets[ipred].descriptor-self.tracks[itrack].descriptor,ord=2)/22
+                    else:
+                        desc_dist = np.linalg.norm(dets[ipred].hog-self.tracks[itrack].hog, ord=1)/1.3
                 
                 iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
-              
+                iou_dist = 1-iou_overlap
+                self.distances.append([self.frameCount,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
                 #uncertainety =np.maximum(1-dets[ipred].conf,0.5)
+                total_dist = iou_dist +desc_dist
+                #if(desc_dist>8):
+                    #total_dist = total_dist +1.0
+                dists[ipred,itrack] = total_dist
             
-                dists[ipred,itrack] = ((1-iou_overlap))
                 
                 #dists[ipred,itrack] = ((1-iou_overlap)+desc_dist)
         return dists
-    def get_predicted_tracks(self,frame_gray,prev_frame_gray):
+    def get_predicted_tracks(self,scale_x,scale_y):
         adds = []
         for t,trk in enumerate(self.tracks):
             
             trk.predict(None,None)
                 
-            adds.append([trk.conf,trk.pred_xmin,trk.pred_ymin,trk.pred_xmax,trk.pred_ymax])
+            adds.append([trk.conf,trk.pred_xmin*0.9323,trk.pred_ymin*0.9310,trk.pred_xmax*0.9323,trk.pred_ymax*0.9310])
         return adds
     def filter_proposals(self,dets,frame_gray,prev_frame_gray):
-        dists = self.get_distance_matrix(dets,[t for t in self.tracks if t.tracked_count>3] ,frame_gray)
+        dists = self.get_simple_distance_matrix(dets,[t for t in self.tracks ] ,frame_gray)
         
         r,c = linear_sum_assignment(dists)
         for ri,rval in enumerate(r):
-          if(dists[r[ri],c[ri]]>0.2):
+          
+          if(dists[r[ri],c[ri]]>0.8):
             r[ri] = -1
             c[ri] = -1
 
@@ -81,10 +104,63 @@ class Tracker(object):
                 
                 trk.update(dets[np.where(c==t)[0][0]],None,None)
         return inds,adds
-                 
-    def track(self,dets_tensor,descs_tensor ,frame_gray,prev_frame_gray):
+    def supress_Cyclists(self,res):
+        bike_ymins = []
+        bike_ymaxes= []
+        bike_count=0
+        classes = res.pred_classes.numpy()
+
+        g = np.where(classes==1)
+
+        processed = []
+        bike_ymins = [v[1].numpy() for v in res.pred_boxes[g]]
+        bike_ymaxes = [v[3].numpy() for v in res.pred_boxes[g]]
+        bike_xmins = [v[0].numpy() for v in res.pred_boxes[g]]
+        bike_xmaxes = [v[2].numpy() for v in res.pred_boxes[g]]
+        bike_count = len(bike_xmins)
+        inds = []
+        for i in np.arange(len(res.pred_boxes)):
+
+            xmin = int(res.pred_boxes[int(i)].tensor[0,0].numpy())
+            ymin = int(res.pred_boxes[int(i)].tensor[0,1].numpy())
+            xmax = int(res.pred_boxes[int(i)].tensor[0,2].numpy())
+            ymax = int(res.pred_boxes[int(i)].tensor[0,3].numpy())
+          
+          
+            
+            pred_class= int(np.array(res.pred_classes[int(i)],ndmin=1))
+            if(pred_class==1):
+            
+            
+                continue
+            if(pred_class==0 and bike_count>0):
+                bike_index =0
+                found = False
+                for bike_ymin in bike_ymins:
+
+                    if(abs(ymax-bike_ymin) <40):
+                        found = True
+                        break
+                    
+                if(found==True):
+                    continue
+              
+            if(pred_class==0 or pred_class==2):
+              #cv2.rectangle(img, (int(xmin), int(ymin)), (int(xmax),int(ymax)),[0,0,128], 3)
+                inds.append(i)
+        return inds
         
-        dets_tensor = dets_tensor.to('cpu')
+        
+        
+    def track(self,dets_org,descs_tensor ,frame,prev_frame_gray):
+        
+        frame_gray = cv.imread(frame, cv.COLOR_BGR2GRAY)
+        
+        #dets_org = dets_org.to('cpu')
+        
+        inds = self.supress_Cyclists(dets_org)
+       
+        dets_tensor = dets_org
         descs_tensor = descs_tensor.to('cpu')
         self.image_size = dets_tensor._image_size
         dets = []
@@ -92,13 +168,21 @@ class Tracker(object):
         missed_dets = 0
         matched = 0
         for i in np.arange(len(dets_tensor.pred_boxes)):
+            
             xmin = dets_tensor.pred_boxes[int(i)].tensor[0,0].numpy()
             ymin = dets_tensor.pred_boxes[int(i)].tensor[0,1].numpy()
             xmax = dets_tensor.pred_boxes[int(i)].tensor[0,2].numpy()
             ymax = dets_tensor.pred_boxes[int(i)].tensor[0,3].numpy()
             
             dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i]))
-       
+                
+            
+                
+            if(self.use_appearance and not self.use_embed):
+                dets[i].calc_hog_descriptor(frame_gray)
+            else:
+                dets[i].hog=None
+            
         list_classes = [d.pred_class for d in dets]
         list_classes_tracks = [d.pred_class for d in self.tracks]
         list_classes = list(set(list_classes).union(set(list_classes_tracks)))
@@ -108,11 +192,17 @@ class Tracker(object):
            
             dists = self.get_distance_matrix(dets_class,track_class,frame_gray)
             r,c = linear_sum_assignment(dists)
-           
+          
             for ri,rval in enumerate(r):
-              if(dists[rval,c[ri]]>0.5):
-                r[ri] = -1
-                c[ri] = -1
+                limit = 0.6
+                if(self.use_appearance==True):
+                  if(self.use_embed==True):
+                    limit = 1.2
+                  else:
+                    limit  =1.2
+                if(dists[r[ri],c[ri]]>limit):
+                  r[ri] = -1
+                  c[ri] = -1
                 
             
             
@@ -132,8 +222,9 @@ class Tracker(object):
                     trk.update(dets_class[np.where(c==t)[0][0]],None,None)
                     matched +=1
             for d,det in enumerate(dets_class):
-                if(d not in r):
+                if(d not in r and det.conf>0.4):
                     missed_dets+=1
+                    
                     self.tracks.append(Track(self.tracking_method,self.cur_id,det,frame_gray))
                     self.cur_id+=1
         #print('Output Matching: %d tracks were matched (across %d classes), %d detections were added, and %d unmatched tracks'%(matched,len(list_classes),missed_dets,missed_tracks))

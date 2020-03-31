@@ -10,6 +10,7 @@ class Detection(object):
         self.pred_class = pred_class
         
         self.descriptor = np.array(list(map(float,desc)))
+        
     def topleft(self):
         return np.array([self.xmin,self.ymin],np.float32)
     def topright(self):
@@ -27,10 +28,10 @@ class Detection(object):
         return np.array([(self.xmin+self.xmax)/2,(self.ymin+self.ymax)/2],np.float32)
     def calc_hog_descriptor(self,frame):
        
-        self.hog = utils.get_hog_descriptor(frame,self.xmin,self.ymin,self.xmax,self.ymax)
+        self.hog = get_hog_descriptor(frame,self.xmin,self.ymin,self.xmax,self.ymax)
         
     def copy(self):
-        other = Detection(self.conf,[self.xmin,self.ymin,self.xmax,self.ymax])
+        other = Detection(self.conf,[self.xmin,self.ymin,self.xmax,self.ymax],self.pred_class)
         return other
     def area(self):
         return (self.xmax-self.xmin)*(self.ymax-self.ymin)
