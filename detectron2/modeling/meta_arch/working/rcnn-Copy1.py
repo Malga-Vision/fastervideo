@@ -17,8 +17,6 @@ from .build import META_ARCH_REGISTRY
 from scipy.cluster.hierarchy import dendrogram, linkage,fcluster
 from sklearn.preprocessing import normalize
 import time
-from .reid import LightWeight
-import cv2 as cv2
 __all__ = ["GeneralizedRCNN", "ProposalNetwork","VideoRCNN"]
 
 
@@ -38,7 +36,7 @@ class VideoRCNN(nn.Module):
         self.backbone = build_backbone(cfg)
         self.proposal_generator = build_proposal_generator(cfg, self.backbone.output_shape())
         self.roi_heads = build_roi_heads(cfg, self.backbone.output_shape())
-        
+        self.tracker = Tracker()
         self.proposals_used = []
         self.top_five_logits = []
         assert len(cfg.MODEL.PIXEL_MEAN) == len(cfg.MODEL.PIXEL_STD)
@@ -49,13 +47,8 @@ class VideoRCNN(nn.Module):
         self.to(self.device)
         self.total_times = []
         self.det_times = []
-        self.prev_grey = None
-        self.frame = None
-        self.cur_grey = None
-        self.reid_network = None
-        
-        
-    def forward(self, batched_inputs, detected_instances=None):
+
+    def forward(self, batched_inputs):
         """
         Args:
             batched_inputs: a list, batched outputs of :class:`DatasetMapper` .
@@ -79,9 +72,8 @@ class VideoRCNN(nn.Module):
                     "pred_boxes", "pred_classes", "scores", "pred_masks", "pred_keypoints"
         """
         if not self.training:
-            return self.inference(batched_inputs, detected_instances)
-       
-        #print([f['file_name'] for f in batched_inputs])
+            return self.inference(batched_inputs)
+
         images = self.preprocess_image(batched_inputs)
         if "instances" in batched_inputs[0]:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
@@ -94,24 +86,15 @@ class VideoRCNN(nn.Module):
             gt_instances = None
 
         features = self.backbone(images.tensor)
-        labels_total = []
-        pairs_used = batched_inputs[0]['pairs_used']
-     
-        
-        for x in batched_inputs:
-                
-            labels_total.append(x['ids'])
+
         if self.proposal_generator:
             proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
-       
         else:
             assert "proposals" in batched_inputs[0]
             proposals = [x["proposals"].to(self.device) for x in batched_inputs]
             proposal_losses = {}
-            
-            
-       
-        _, detector_losses = self.roi_heads(images, features, proposals, gt_instances,labels = labels_total,pairs_used = pairs_used)
+
+        _, detector_losses = self.roi_heads(images, features, proposals, gt_instances)
 
         losses = {}
         losses.update(detector_losses)
@@ -196,8 +179,6 @@ class VideoRCNN(nn.Module):
         proposal_boxes = Boxes(merged.to('cuda')),
         objectness_logits = conf_cuda)
         return new_proposals
-
-    
     def inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
         """
         Run inference on the given inputs.
@@ -215,22 +196,16 @@ class VideoRCNN(nn.Module):
         Returns:
             same as in :meth:`forward`.
         """
-        #if(self.reid_network==None and self.use_reid == True):
-            
-            #self.reid_network = LightWeight()
-            #self.reid_network.load_state_dict(torch.load('/home/issa_mouawad/tracking_wo_bnw/output/tracktor/KITTI/test/LightWeight_iter_686.pth',
-                                     #map_location=lambda storage, loc: storage))
-            #self.reid_network.eval()
-            #self.reid_network.cuda()
-        frame_gray = cv2.imread(self.photo_name, cv2.COLOR_BGR2GRAY)
-        frame = cv2.imread(self.photo_name)
-        prev_gray=None
-        if(self.prev_path!=0):
-            prev_gray = cv2.imread(self.prev_path,cv2.COLOR_BGR2GRAY)
         assert not self.training
         start = time.time()
         images = self.preprocess_image(batched_inputs)
-        
+        input_size = (batched_inputs[0]['height'],batched_inputs[0]['width'])
+        transformed_size = np.array(images.tensor.shape)[2:4]
+        #print(input_size)
+        #print(transformed_size)
+        scale_x,scale_y = transformed_size/input_size[0:2]
+        #print(scale_x,scale_y)
+        self.img_transformed = images.tensor.to('cpu').numpy()
 
         #print(self.backbone.size_divisibility)
         features = self.backbone(images.tensor)
@@ -256,18 +231,17 @@ class VideoRCNN(nn.Module):
                         thresh = pprops[:self.props_limit]
                     dets = []
                     i=0
-                    
+                    for b in thresh.proposal_boxes:
+                      bcpu = b.cpu().numpy()
+                      conf = np.array(thresh.objectness_logits[i].cpu(),ndmin=1)[0]
+                      d = Detection(conf,[bcpu[0],bcpu[1],bcpu[2],bcpu[3]],0)
+                      d.hog = 0
+                      dets.append(d)
                     if(self.remove_duplicate_tracks==True):
-                      for b in thresh.proposal_boxes:
-                        bcpu = b.cpu().numpy()
-                        conf = np.array(thresh.objectness_logits[i].cpu(),ndmin=1)[0]
-                        d = Detection(conf,[bcpu[0],bcpu[1],bcpu[2],bcpu[3]],0)
-                        d.hog = 0
-                        dets.append(d)
                       inds,adds = self.tracker.filter_proposals(dets,None,None)
                       
                     else:
-                      adds = self.tracker.get_predicted_tracks(frame_gray,prev_gray,0,0)
+                      adds = self.tracker.get_predicted_tracks(scale_x,scale_y)
                     self.proposals_used.append(len(adds)+self.props_limit)
                     props_boxes = thresh.proposal_boxes.tensor
                     prop_scores = thresh.objectness_logits
@@ -286,16 +260,12 @@ class VideoRCNN(nn.Module):
             else:
                 assert "proposals" in batched_inputs[0]
                 proposals = [x["proposals"].to(self.device) for x in batched_inputs]
-            
-            results, descs,embeds = self.roi_heads(images, features, proposals, None)
-            #print((results[0]))
-            #print(len(descs_pooled))
+
+            results, descs = self.roi_heads(images, features, proposals, None)
         else:
-            #detected_instances = [x.to(self.device) for x in detected_instances]
-            embeds = self.roi_heads.forward_with_given_boxes(features, detected_instances)
-            return embeds
-            #results = self.roi_heads.forward_with_given_boxes(features, [detected_instances])
-       
+            detected_instances = [x.to(self.device) for x in detected_instances]
+            results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
+
         if do_postprocess:
             processed_results = []
             for results_per_image, input_per_image, image_size in zip(
@@ -308,11 +278,7 @@ class VideoRCNN(nn.Module):
                 torch.cuda.synchronize()
                 end = time.time()
                 self.det_times.append(end-start)
-                if(self.use_reid==True):
-                    
-                    self.tracker.track(r,embeds, self.photo_name,prev_gray,frame)
-                else:
-                    self.tracker.track(r,descs, self.photo_name,prev_gray,frame)
+                self.tracker.track(r,descs, self.photo_name,None)
                 b = self.tracker.get_display_tracks()
                 self.total_times.append(time.time()-start)
                 return b

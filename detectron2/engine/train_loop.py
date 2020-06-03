@@ -126,8 +126,11 @@ class TrainerBase:
 
         with EventStorage(start_iter) as self.storage:
             try:
+                
                 self.before_train()
+                
                 for self.iter in range(start_iter, max_iter):
+                    #print('iter',self.iter)
                     self.before_step()
                     self.run_step()
                     self.after_step()
@@ -205,11 +208,12 @@ class SimpleTrainer(TrainerBase):
         """
         data = next(self._data_loader_iter)
         data_time = time.perf_counter() - start
-
+        #print(data)
         """
         If your want to do something with the losses, you can wrap the model.
         """
         loss_dict = self.model(data)
+        #print(loss_dict)
         losses = sum(loss for loss in loss_dict.values())
         self._detect_anomaly(losses, loss_dict)
 

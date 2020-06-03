@@ -17,6 +17,7 @@ import torch
 from fvcore.common.file_io import PathManager
 from fvcore.nn.precise_bn import get_bn_modules
 from torch.nn.parallel import DistributedDataParallel
+from detectron2.structures import Instances,Boxes
 
 import detectron2.data.transforms as T
 from detectron2.checkpoint import DetectionCheckpointer
@@ -161,6 +162,19 @@ class DefaultPredictor:
         assert self.input_format in ["RGB", "BGR"], self.input_format
 
     @torch.no_grad()
+    def get_features(self,original_image,boxes):
+        if self.input_format == "RGB":
+            # whether the model expects BGR inputs or RGB
+            original_image = original_image[:, :, ::-1]
+        height, width = original_image.shape[:2]
+        image = self.transform_gen.get_transform(original_image).apply_image(original_image)
+        image = torch.as_tensor(image.astype("float32").transpose(2, 0, 1))
+        merged_boxes = torch.from_numpy(boxes).float().to('cuda')
+        props = Instances(original_image.shape[:2],proposal_boxes = Boxes(merged_boxes))
+        inputs = {"image": image, "height": height, "width": width}
+        predictions = self.model([inputs],detected_instances = props)
+        return predictions
+    @torch.no_grad()
     def __call__(self, original_image,prop_limit,max_distance):
         """
         Args:
@@ -180,7 +194,13 @@ class DefaultPredictor:
         inputs = {"image": image, "height": height, "width": width}
         self.model.props_limit=prop_limit
         self.model.max_distance = max_distance
-        predictions = self.model([inputs])
+        
+        #merged_boxes = torch.from_numpy(detected_instances).float().to('cuda')
+        
+                    
+        
+        #props = Instances(original_image.shape[:2],proposal_boxes = Boxes(merged_boxes))
+        predictions = self.model([inputs])#,detected_instances = props)
         return predictions
 
 
@@ -401,6 +421,7 @@ class DefaultTrainer(SimpleTrainer):
         It now calls :func:`detectron2.data.build_detection_train_loader`.
         Overwrite it if you'd like a different data loader.
         """
+        #return DataLoader(db_train, batch_size=1, shuffle=True)
         return build_detection_train_loader(cfg)
 
     @classmethod

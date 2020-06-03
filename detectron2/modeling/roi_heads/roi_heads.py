@@ -4,7 +4,7 @@ import numpy as np
 from typing import Dict
 import torch
 from torch import nn
-
+from detectron2.structures import Boxes
 from detectron2.layers import ShapeSpec
 from detectron2.structures import Boxes, Instances, pairwise_iou
 from detectron2.utils.events import get_event_storage
@@ -20,6 +20,7 @@ from .box_head import build_box_head
 from .fast_rcnn import FastRCNNOutputLayers, FastRCNNOutputs
 from .keypoint_head import build_keypoint_head, keypoint_rcnn_inference, keypoint_rcnn_loss
 from .mask_head import build_mask_head, mask_rcnn_inference, mask_rcnn_loss
+from .reid_head import build_reid_head
 
 ROI_HEADS_REGISTRY = Registry("ROI_HEADS")
 ROI_HEADS_REGISTRY.__doc__ = """
@@ -482,7 +483,34 @@ class StandardROIHeads(ROIHeads):
         self._init_box_head(cfg)
         self._init_mask_head(cfg)
         self._init_keypoint_head(cfg)
+        self._init_reid_head(cfg)
+        
+    def _init_reid_head(self,cfg):
+        pooler_resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
+        pooler_scales     = tuple(1.0 / self.feature_strides[k] for k in self.in_features)
+        sampling_ratio    = cfg.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO
+        pooler_type       = cfg.MODEL.ROI_BOX_HEAD.POOLER_TYPE
+        # fmt: on
 
+        # If StandardROIHeads is applied on multiple feature maps (as in FPN),
+        # then we share the same predictors and therefore the channel counts must be the same
+        in_channels = [self.feature_channels[f] for f in self.in_features]
+        # Check all channel counts are equal
+        assert len(set(in_channels)) == 1, in_channels
+        in_channels = in_channels[0]
+
+        self.box_pooler = ROIPooler(
+            output_size=pooler_resolution,
+            scales=pooler_scales,
+            sampling_ratio=sampling_ratio,
+            pooler_type=pooler_type,
+        )
+        # Here we split "box head" and "box predictor", which is mainly due to historical reasons.
+        # They are used together so the "box predictor" layers should be part of the "box head".
+        # New subclasses of ROIHeads do not need "box predictor"s.
+        self.reid_head = build_reid_head(
+            cfg, ShapeSpec(channels=in_channels, height=pooler_resolution, width=pooler_resolution)
+        )
     def _init_box_head(self, cfg):
         # fmt: off
         pooler_resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
@@ -562,15 +590,15 @@ class StandardROIHeads(ROIHeads):
             cfg, ShapeSpec(channels=in_channels, width=pooler_resolution, height=pooler_resolution)
         )
 
-    def forward(self, images, features, proposals, targets=None):
+    def forward(self, images, features, proposals, targets=None,labels = None,pairs_used = None):
         """
         See :class:`ROIHeads.forward`.
         """
         del images
         if self.training:
             proposals = self.label_and_sample_proposals(proposals, targets)
-        del targets
-
+        #del targets
+        
         features_list = [features[f] for f in self.in_features]
 
         if self.training:
@@ -579,14 +607,119 @@ class StandardROIHeads(ROIHeads):
             # used by the mask, keypoint (and densepose) heads.
             losses.update(self._forward_mask(features_list, proposals))
             losses.update(self._forward_keypoint(features_list, proposals))
+            losses.update(self._forward_reid(features_list, targets,labels,pairs_used))
             return proposals, losses
         else:
-            pred_instances,desc = self._forward_box(features_list, proposals)
+            pred_instances,desc,desc_pooled = self._forward_box(features_list, proposals)
             # During inference cascaded prediction is used: the mask and keypoints heads are only
             # applied to the top scoring box detections.
-            pred_instances = self.forward_with_given_boxes(features, pred_instances)
-            return pred_instances, desc
+            #pred_instances = self.forward_with_given_boxes(features, pred_instances)
+            return pred_instances, desc,desc_pooled
+    def _forward_reid_old(self,features,proposals,labels):
+     
+        props = [x.gt_boxes for x in proposals]
+        classes = [x.gt_classes for x in proposals]
+        fin_props = []
+        i =0
+        
+        both = set(labels[0])
+        for l in labels:
+            both = both.intersection(l)
+        
+        
+       
+        for v in labels:
+            indices = [v.index(x) for x in both]
+           
+            fin_props.append(props[i][indices])
+            
+            i+=1
+        
+        box_features = self.box_pooler(features, fin_props)
+       
+        
+        if self.training:
+            
+            mod_labels = []
+            for l in range(len(labels)):
+                mod_labels += list(both)
+            print(box_features.shape)
+            print(mod_labels)
+            if(box_features.shape[0] != len(mod_labels)):
+                print('that is very weird!!!!')
+                print(props)
+                print(labels)
+            #print(mod_labels)
+            return self.reid_head.sum_losses(box_features,torch.tensor(mod_labels).to('cuda:0'),'batch_hard',0.2,True)
+        else:
+            
+            return  self.reid_head(box_features)
+        
+    def _forward_reid(self,features,proposals,labels,pairs_used):
+        if(self.training):
+            props = [x.gt_boxes for x in proposals]
+            classes = [x.gt_classes for x in proposals]
+            fin_props = []
+            i =0
 
+            #both = set(labels[0])
+            #for l in labels:
+                #both = both.intersection(l)
+
+
+            mod_labels = []
+            for v in labels:
+                indices = [v.index(x) for x in pairs_used if x in v]
+                mod_labels += [x for x in pairs_used if x in v]
+                fin_props.append(props[i][indices])
+
+                i+=1
+
+            box_features = self.box_pooler(features, fin_props)
+
+
+
+
+
+            #print(box_features.shape)
+            #print(mod_labels)
+            #print(labels)
+            #print(pairs_used)
+            if(box_features.shape[0] != len(mod_labels) or box_features.shape[0]==0):
+                print('that is very weird!!!!')
+                print(props)
+                print(labels)
+            #print(mod_labels)
+            pos_indices = [idx for idx, element in enumerate(mod_labels) if element > 0]
+            neg_indices = [idx for idx, element in enumerate(mod_labels) if element < 0]
+            first_part = 0
+            second_part = 0
+            
+            #if(len(neg_indices)>0):
+                #first_part =  self.reid_head.sum_losses(box_features[neg_indices],torch.tensor([mod_labels[i] for i in neg_indices]).to('cuda:0'),'batch_hard',0.2,True)
+            #if(len(pos_indices)>0):
+                #second_part =  self.reid_head.sum_losses(box_features[pos_indices],torch.tensor([mod_labels[i] for i in pos_indices]).to('cuda:0'),'batch_hard',0.2,True)
+            #first_part['reid_loss'] += second_part['reid_loss']
+            #print(first_part['prec_at_k'])
+            #final = None
+            #if(len(neg_indices)>0):
+                
+                #final = first_part
+            #if(len(pos_indices)>0):
+                
+                #if(len(neg_indices)>0):
+                   
+                    #final = first_part
+                    #final['reid_loss']+=second_part['reid_loss']
+                #else:
+                    
+                    #final = second_part
+            #return final
+            return self.reid_head.sum_losses(box_features,torch.tensor(mod_labels).to('cuda:0'),'batch_hard',0.2,True)
+        else:
+            box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
+            return  self.reid_head(box_features)
+        
     def forward_with_given_boxes(self, features, instances):
         """
         Use the given boxes in `instances` to produce other (non-box) per-ROI outputs.
@@ -606,12 +739,15 @@ class StandardROIHeads(ROIHeads):
                 fields such as `pred_masks` or `pred_keypoints`.
         """
         assert not self.training
-        assert instances[0].has("pred_boxes") and instances[0].has("pred_classes")
+        #assert instances[0].has("pred_boxes") and instances[0].has("pred_classes")
         features = [features[f] for f in self.in_features]
-
-        instances = self._forward_mask(features, instances)
-        instances = self._forward_keypoint(features, instances)
-        return instances
+        #print(instances)
+        box_features = self.box_pooler(features, [instances.proposal_boxes])
+        
+        return box_features
+        #instances = self._forward_mask(features, instances)
+        #instances = self._forward_keypoint(features, instances)
+        #return instances
 
     def _forward_box(self, features, proposals):
         """
@@ -628,9 +764,12 @@ class StandardROIHeads(ROIHeads):
             In training, a dict of losses.
             In inference, a list of `Instances`, the predicted instances.
         """
+        
         box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
-        box_features = self.box_head(box_features)
-        pred_class_logits, pred_proposal_deltas = self.box_predictor(box_features)
+        
+        
+        box_features_pooled = self.box_head(box_features)
+        pred_class_logits, pred_proposal_deltas = self.box_predictor(box_features_pooled)
         
 
         outputs = FastRCNNOutputs(
@@ -646,8 +785,17 @@ class StandardROIHeads(ROIHeads):
             pred_instances, _ = outputs.inference(
                 self.test_score_thresh, self.test_nms_thresh, self.test_detections_per_img
             )
-            return pred_instances,box_features
-
+            #print(pred_instances)
+            sel_box_features = self.box_pooler(features,[x.pred_boxes for x in pred_instances])
+            #sel_box_features_pooled = self.box_head(sel_box_features)
+            box_embeddings = []
+            if(sel_box_features.shape[0]>0):
+                #print(sel_box_features.shape)
+                box_embeddings = self.reid_head(sel_box_features)
+            else:
+                box_embeddings = torch.tensor(box_embeddings).to('cuda:0')
+            return pred_instances,sel_box_features,box_embeddings
+            
     def _forward_mask(self, features, instances):
         """
         Forward logic of the mask prediction branch.

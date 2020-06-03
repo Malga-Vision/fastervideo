@@ -145,7 +145,7 @@ def ios(a,b):
 	# RATIO OF AREA OF OVERLAP OVER COMBINED AREA
 	iou = area_overlap / (area_combined+epsilon)
 	return iou   
-def get_hog_descriptor(frame,xmin,ymin,xmax,ymax,num_cells=1):
+def get_hog_descriptor(frame,xmin,ymin,xmax,ymax):
     
     if(xmin<0):
         xmin = 0
@@ -157,14 +157,11 @@ def get_hog_descriptor(frame,xmin,ymin,xmax,ymax,num_cells=1):
         ymax=0
     
     section = frame[int(ymin):int(ymax),int(xmin):int(xmax)]
-    
     if(section.shape[0]==0 or section.shape[1]==0):
-       
-        return np.zeros(9*num_cells*num_cells)
-        
+        return np.zeros(9)
         #return np.zeros(36)
     #return hog(section,pixels_per_cell=(section.shape[0]/2,section.shape[1]/2),cells_per_block=(1, 1),feature_vector=True)
-    return hog(section,pixels_per_cell=(section.shape[0]/num_cells,section.shape[1]/num_cells),cells_per_block=(num_cells, num_cells),feature_vector=True)
+    return hog(section,pixels_per_cell=(section.shape[0],section.shape[1]),cells_per_block=(1, 1),feature_vector=True)
 def get_points_in_bb(points,corners):
     sels = []
 

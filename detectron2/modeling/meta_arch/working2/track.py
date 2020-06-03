@@ -4,7 +4,7 @@ from .detection import *
 from .utils import *
 import math
 class Track(Detection):
-    def __init__(self,method,_id,det,frame_gray,conf=0,major_color=[],process_noise=1,measurement_noise=1):
+    def __init__(self,method,_id,det,frame_gray,conf=0):
         
         self.conf = conf
         self.xmin = det.xmin
@@ -18,11 +18,12 @@ class Track(Detection):
         self.pred_ymax = det.ymax
         self.tracked_count = 1
         self.hog = det.hog
-        self.frame_gray = frame_gray
-        
-        self.major_color=major_color
-        
-        
+        self.color=det.color
+        self.centers= []
+        self.areas = []
+        self.prev_points = []
+        self.new_points = []
+        self.offset = np.array([0,0],np.float32)
         self.missed_count=0
         self.matched=True
         self.descriptor = np.array(np.zeros(det.descriptor.shape[0],np.float32))
@@ -34,10 +35,26 @@ class Track(Detection):
         if(method=='kalman_vel'):
             self.init_kalman_tracker_vel()
         elif(method=='kalman_acc'):
-            self.init_kalman_tracker_acc(measurement_noise,process_noise)
-        
+            self.init_kalman_tracker_acc()
+        self.init_offset_tracker()
             
-   
+    def init_offset_tracker(self):
+        self.offset_tracker= cv.KalmanFilter(4,2)
+        self.offset_tracker.measurementMatrix = np.array([[1,0,0,0],
+                                     [0,1,0,0]],np.float32)
+
+        self.offset_tracker.transitionMatrix = np.array([[1,0,1,0],
+                                    [0,1,0,1],
+                                    [0,0,1,0],
+                                    [0,0,0,1]],np.float32)
+
+        self.offset_tracker.processNoiseCov = np.array([[1,0,0,0],
+                                   [0,1,0,0],
+                                   [0,0,1,0],
+                                   [0,0,0,1]],np.float32) * 0.001
+        self.offset_tracker.correct(self.offset)
+        self.offset_tracker.predict();
+    
     def init_kalman_tracker_vel(self):
         self.kalman_tracker = cv.KalmanFilter(8,4)
         self.kalman_tracker.measurementMatrix = np.array([[1,0,0,0,0,0,0,0],
@@ -61,22 +78,19 @@ class Track(Detection):
                                                         [0,0,0,0,1,0,0,0],
                                                         [0,0,0,0,0,1,0,0],
                                                         [0,0,0,0,0,0,1,0],
-                                                        [0,0,0,0,0,0,0,1]],np.float32)*0.002
+                                                        [0,0,0,0,0,0,0,1]],np.float32)
 
         self.kalman_tracker.predict();
 
         self.kalman_tracker.correct(self.corners())
         
-    def init_kalman_tracker_acc(self,measurement_noise,process_noise):
+    def init_kalman_tracker_acc(self):
         self.kalman_tracker = cv.KalmanFilter(12,4)
         self.kalman_tracker.measurementMatrix = np.array([[1,0,0,0,0,0,0,0,0,0,0,0],
                                                           [0,1,0,0,0,0,0,0,0,0,0,0],
                                                           [0,0,1,0,0,0,0,0,0,0,0,0],
                                                           [0,0,0,1,0,0,0,0,0,0,0,0]],np.float32)
-        self.kalman_tracker.measurementNoiseCov = np.array([[1,0,0,0],
-                                                            [0,1,0,0],
-                                                            [0,0,1,0],
-                                                            [0,0,0,1]],np.float32)*measurement_noise
+
         self.kalman_tracker.transitionMatrix = np.array([[1,0,0,0,1,0,0,0,0.5,0,0,0],
                                                          [0,1,0,0,0,1,0,0,0,0.5,0,0],
                                                          [0,0,1,0,0,0,1,0,0,0,0.5,0],
@@ -101,10 +115,9 @@ class Track(Detection):
                                                         [0,0,0,0,0,0,0,0,1,0,0,0],
                                                         [0,0,0,0,0,0,0,0,0,1,0,0],
                                                         [0,0,0,0,0,0,0,0,0,0,1,0],
-                                                        [0,0,0,0,0,0,0,0,0,0,0,1]],np.float32)*process_noise
-     
-                                                                 
-                                                        
+                                                        [0,0,0,0,0,0,0,0,0,0,0,1]],np.float32)*0.1
+        
+        self.kalman_tracker.measurementNoiseCov = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]],np.float32)*0.00001
 
         self.kalman_tracker.predict();
 
@@ -117,7 +130,7 @@ class Track(Detection):
         ymin = self.ymin
         ymax = self.ymax
         
-        other = Track(self.track_id,np.array([0,self.conf,xmin,ymin,xmax,ymax],np.float32),self.frame_gray)
+        other = Track(self.track_id,np.array([0,self.conf,xmin,ymin,xmax,ymax],np.float32),None)
         other.tracked_count = self.tracked_count
         other.missed_count = self.missed_count
         other.matched = self.matched
@@ -131,20 +144,27 @@ class Track(Detection):
         self.matched = True
         self.missed_count = 0
         self.tracked_count +=1
-        
-        
-        if(len(det.major_color)>0 and len(self.major_color)>0):
-            self.major_color[0] = (det.major_color[0]+4*self.major_color[0])/5
         if(self.is_overlap==False):
+            self.descriptor = det.descriptor
             self.hog= det.hog
-            self.descriptor = 0.7 * self.descriptor + 0.3 *det.descriptor
-
+            self.color=det.color
+        if(self.tracked_count>3):
+            self.conf = np.maximum(det.conf,0.5)
+        else:
+            self.conf = 0
+       
+        if(self.method=='keypoint_flow' or self.method=='dense_flow'):
+            
+            self.xmin = det.xmin
+            self.ymin = det.ymin
+            self.xmax=det.xmax
+            self.ymax = det.ymax
            
         if(self.method=='kalman_acc' or self.method=='kalman_vel' ):
             self.predict(prev_frame_gray,frame_gray)
             pred = self.kalman_tracker.predict()
             self.kalman_tracker.correct(det.corners())
-         
+#           
             if(self.tracked_count>15):
                 self.xmin = self.pred_xmin
                 self.ymin = self.pred_ymin
@@ -159,7 +179,35 @@ class Track(Detection):
                 self.ymax = det.ymax
             
                 
-    
+    def search_local_best_match(self,frame):
+        s=8
+        shift_x = 0
+        shift_y =0
+        shifts_x = []
+        shifts_y = []
+        sel_dist = np.linalg.norm(get_hog_descriptor(frame,self.pred_xmin,self.pred_ymin,self.pred_xmax,self.pred_ymax)-self.hog,ord=1)
+        init_dist = sel_dist
+        while s>=1:
+            shift_x = 0
+            shift_y = 0
+            for x in (-s,0,s):
+                for y in(-s,0,s):
+                    
+                    dist = np.linalg.norm(get_hog_descriptor(frame,self.pred_xmin+x,self.pred_ymin+y,self.pred_xmax+x,self.pred_ymax+y)-self.hog,ord=1)
+                    if(dist<sel_dist):
+                       sel_dist = dist
+                       shift_x = x
+                       shift_y = y
+            shifts_x.append(shift_x)
+            shifts_y.append(shift_y)
+            self.pred_xmin  += shift_x
+            self.pred_xmax  += shift_x
+            self.pred_ymin  += shift_y
+            self.pred_ymax  += shift_y
+            s = s/2
+        
+        
+        
     def apply_prediction(self,frame_gray,prev_frame_gray):
         
         self.predict(prev_frame_gray,frame_gray)
@@ -170,17 +218,32 @@ class Track(Detection):
             self.ymin = self.pred_ymin
             self.xmax = self.pred_xmax
             self.ymax = self.pred_ymax
-        elif(self.missed_count>0 and self.missed_count<3):
+        elif(self.missed_count<3):
             self.xmin = self.pred_xmin
             self.ymin = self.pred_ymin
             self.xmax = self.pred_xmax
             self.ymax = self.pred_ymax
-
+        
+#             
+        #elif(desc_dist<0.2):
+            #self.xmin = (self.pred_xmin + self.xmin)/2
+            #self.ymin = (self.pred_ymin+ self.ymin)/2
+            #self.xmax = (self.pred_xmax+ self.xmax)/2
+            #self.ymax = (self.pred_ymax+ self.ymax)/2
+            
+            #if(self.missed_count>6):
+                #self.conf=0
+        #else:
+            
+            #if(self.missed_count>6):
+                #self.conf=0
+            #if(self.missed_count>6):
+                #self.conf =-0.1
     def draw_own_mask(self,mask):
         cv.rectangle(mask, (int(self.xmin), int(self.ymin)), (int(self.xmax), int(self.ymax)), (255, 255, 255), -1)
     
     def shiftKeyPointsFlow(self,frame,prev_frame):
-
+	
         frame_grey = cv.cvtColor(frame,cv.COLOR_BGR2GRAY)
         frame_width = frame_grey.shape[1]
         frame_height = frame_grey.shape[0]
@@ -240,7 +303,7 @@ class Track(Detection):
         elif(self.method =='dense_flow'):
             self.shiftFBFlow()
     def __repr__(self):
-        return "id:%d, xmin: %f, ymin:%f, xmax:%f, ymax:%f, conf:%f, class:%d"%(self.track_id, self.xmin,self.ymin,self.xmax,self.ymax,self.conf,self.pred_class)
+        return "xmin: %f, ymin:%f, xmax:%f, ymax:%f, conf:%f, class:%d"%(self.xmin,self.ymin,self.xmax,self.ymax,self.conf,self.pred_class)
         
            
             

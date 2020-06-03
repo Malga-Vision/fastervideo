@@ -8,7 +8,7 @@ class Detection(object):
         self.ymax = float(bbox[3])
         self.conf = float(conf)
         self.pred_class = pred_class
-        self.major_color = []
+        
         self.descriptor = np.array(list(map(float,desc)))
         
     def topleft(self):
@@ -26,11 +26,10 @@ class Detection(object):
         return z
     def center(self):
         return np.array([(self.xmin+self.xmax)/2,(self.ymin+self.ymax)/2],np.float32)
-    def calc_hog_descriptor(self,frame,hog_num_cells):
+    def calc_hog_descriptor(self,frame):
        
-        self.hog = get_hog_descriptor(frame,self.xmin,self.ymin,self.xmax,self.ymax,hog_num_cells)
-    def calc_major_color(self,frame):
-        self.major_color = calc_major_color(frame,self.xmin,self.ymin,self.xmax,self.ymax)
+        self.hog = get_hog_descriptor(frame,self.xmin,self.ymin,self.xmax,self.ymax)
+        
     def copy(self):
         other = Detection(self.conf,[self.xmin,self.ymin,self.xmax,self.ymax],self.pred_class)
         return other

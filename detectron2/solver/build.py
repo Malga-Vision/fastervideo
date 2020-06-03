@@ -1,7 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 from typing import Any, Dict, List
 import torch
-
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from detectron2.config import CfgNode
 
 from .lr_scheduler import WarmupCosineLR, WarmupMultiStepLR
@@ -38,6 +38,7 @@ def build_lr_scheduler(
     """
     Build a LR scheduler from config.
     """
+    return CosineAnnealingLR(optimizer, 22000)
     name = cfg.SOLVER.LR_SCHEDULER_NAME
     if name == "WarmupMultiStepLR":
         return WarmupMultiStepLR(

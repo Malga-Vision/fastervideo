@@ -4,7 +4,7 @@ from .detection import *
 from .utils import *
 import math
 class Track(Detection):
-    def __init__(self,method,_id,det,frame_gray,conf=0,major_color=[],process_noise=1,measurement_noise=1):
+    def __init__(self,method,_id,det,frame_gray,conf=0,major_color=[]):
         
         self.conf = conf
         self.xmin = det.xmin
@@ -34,7 +34,7 @@ class Track(Detection):
         if(method=='kalman_vel'):
             self.init_kalman_tracker_vel()
         elif(method=='kalman_acc'):
-            self.init_kalman_tracker_acc(measurement_noise,process_noise)
+            self.init_kalman_tracker_acc()
         
             
    
@@ -67,16 +67,13 @@ class Track(Detection):
 
         self.kalman_tracker.correct(self.corners())
         
-    def init_kalman_tracker_acc(self,measurement_noise,process_noise):
+    def init_kalman_tracker_acc(self):
         self.kalman_tracker = cv.KalmanFilter(12,4)
         self.kalman_tracker.measurementMatrix = np.array([[1,0,0,0,0,0,0,0,0,0,0,0],
                                                           [0,1,0,0,0,0,0,0,0,0,0,0],
                                                           [0,0,1,0,0,0,0,0,0,0,0,0],
                                                           [0,0,0,1,0,0,0,0,0,0,0,0]],np.float32)
-        self.kalman_tracker.measurementNoiseCov = np.array([[1,0,0,0],
-                                                            [0,1,0,0],
-                                                            [0,0,1,0],
-                                                            [0,0,0,1]],np.float32)*measurement_noise
+
         self.kalman_tracker.transitionMatrix = np.array([[1,0,0,0,1,0,0,0,0.5,0,0,0],
                                                          [0,1,0,0,0,1,0,0,0,0.5,0,0],
                                                          [0,0,1,0,0,0,1,0,0,0,0.5,0],
@@ -101,8 +98,11 @@ class Track(Detection):
                                                         [0,0,0,0,0,0,0,0,1,0,0,0],
                                                         [0,0,0,0,0,0,0,0,0,1,0,0],
                                                         [0,0,0,0,0,0,0,0,0,0,1,0],
-                                                        [0,0,0,0,0,0,0,0,0,0,0,1]],np.float32)*process_noise
-     
+                                                        [0,0,0,0,0,0,0,0,0,0,0,1]],np.float32)*0.1
+        self.kalman_tracker.measurementNoiseCov=np.array([[1,0,0,0],
+                                                         [0,1,0,0],
+                                                         [0,0,1,0],
+                                                         [0,0,0,1]],np.float32)*0.00001
                                                                  
                                                         
 
@@ -132,12 +132,12 @@ class Track(Detection):
         self.missed_count = 0
         self.tracked_count +=1
         
-        
+        self.descriptor = det.descriptor
         if(len(det.major_color)>0 and len(self.major_color)>0):
             self.major_color[0] = (det.major_color[0]+4*self.major_color[0])/5
         if(self.is_overlap==False):
             self.hog= det.hog
-            self.descriptor = 0.7 * self.descriptor + 0.3 *det.descriptor
+       
 
            
         if(self.method=='kalman_acc' or self.method=='kalman_vel' ):

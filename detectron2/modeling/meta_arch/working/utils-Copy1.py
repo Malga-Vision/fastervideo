@@ -1,6 +1,5 @@
 from .detection import *
 import numpy as np
-import cv2 as cv2
 from scipy.spatial import distance
 from skimage.feature import hog
 import scipy.interpolate as interp
@@ -120,32 +119,8 @@ def iou(a, b):
 
 	# RATIO OF AREA OF OVERLAP OVER COMBINED AREA
 	iou = area_overlap / (area_combined+epsilon)
-	return iou   
-def ios(a,b):
-	epsilon=1e-5
-
-	x1 = max(a[0], b[0])
-	y1 = max(a[1], b[1])
-	x2 = min(a[2], b[2])
-	y2 = min(a[3], b[3])
-
-	# AREA OF OVERLAP - Area where the boxes intersect
-	width = (x2 - x1)
-	height = (y2 - y1)
-	# handle case where there is NO overlap
-	if (width<0) or (height <0):
-		return 0.0
-	area_overlap = width * height
-
-	# COMBINED AREA
-	area_a = (a[2] - a[0]) * (a[3] - a[1])
-	
-	area_combined = area_a  - area_overlap
-
-	# RATIO OF AREA OF OVERLAP OVER COMBINED AREA
-	iou = area_overlap / (area_combined+epsilon)
-	return iou   
-def get_hog_descriptor(frame,xmin,ymin,xmax,ymax,num_cells=1):
+	return iou    
+def get_hog_descriptor(frame,xmin,ymin,xmax,ymax):
     
     if(xmin<0):
         xmin = 0
@@ -157,14 +132,10 @@ def get_hog_descriptor(frame,xmin,ymin,xmax,ymax,num_cells=1):
         ymax=0
     
     section = frame[int(ymin):int(ymax),int(xmin):int(xmax)]
-    
     if(section.shape[0]==0 or section.shape[1]==0):
-       
-        return np.zeros(9*num_cells*num_cells)
-        
-        #return np.zeros(36)
+        return np.zeros(9)
     #return hog(section,pixels_per_cell=(section.shape[0]/2,section.shape[1]/2),cells_per_block=(1, 1),feature_vector=True)
-    return hog(section,pixels_per_cell=(section.shape[0]/num_cells,section.shape[1]/num_cells),cells_per_block=(num_cells, num_cells),feature_vector=True)
+    return hog(section,pixels_per_cell=(section.shape[0],section.shape[1]),cells_per_block=(1, 1),feature_vector=True)
 def get_points_in_bb(points,corners):
     sels = []
 
@@ -191,12 +162,30 @@ def get_distance(v1,v2):
     if(dist>1000):
         dist=30
     return dist
-def calc_major_color(frame,xmin,ymin,xmax,ymax):
-    #hsv = cv2.cvtColor(frame[int(ymin):int(ymax),int(xmin):int(xmax),:], cv2.COLOR_BGR2HSV)
-    #v = np.bincount(hsv.ravel())
-    lab = cv2.cvtColor(frame[int(ymin):int(ymax),int(xmin):int(xmax),:], cv2.COLOR_BGR2Lab)
-    return [np.median(lab)]
-
     
+def ios(a,b):
+	epsilon=1e-5
+
+	x1 = max(a[0], b[0])
+	y1 = max(a[1], b[1])
+	x2 = min(a[2], b[2])
+	y2 = min(a[3], b[3])
+
+	# AREA OF OVERLAP - Area where the boxes intersect
+	width = (x2 - x1)
+	height = (y2 - y1)
+	# handle case where there is NO overlap
+	if (width<0) or (height <0):
+		return 0.0
+	area_overlap = width * height
+
+	# COMBINED AREA
+	area_a = (a[2] - a[0]) * (a[3] - a[1])
+	
+	area_combined = area_a  - area_overlap
+
+	# RATIO OF AREA OF OVERLAP OVER COMBINED AREA
+	iou = area_overlap / (area_combined+epsilon)
+	return iou   
 
 

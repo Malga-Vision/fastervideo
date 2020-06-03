@@ -26,9 +26,9 @@ class Detection(object):
         return z
     def center(self):
         return np.array([(self.xmin+self.xmax)/2,(self.ymin+self.ymax)/2],np.float32)
-    def calc_hog_descriptor(self,frame,hog_num_cells):
+    def calc_hog_descriptor(self,frame):
        
-        self.hog = get_hog_descriptor(frame,self.xmin,self.ymin,self.xmax,self.ymax,hog_num_cells)
+        self.hog = get_hog_descriptor(frame,self.xmin,self.ymin,self.xmax,self.ymax)
     def calc_major_color(self,frame):
         self.major_color = calc_major_color(frame,self.xmin,self.ymin,self.xmax,self.ymax)
     def copy(self):

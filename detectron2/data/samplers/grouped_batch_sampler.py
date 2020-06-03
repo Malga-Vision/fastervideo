@@ -35,10 +35,16 @@ class GroupedBatchSampler(BatchSampler):
         self.buffer_per_group = {k: [] for k in groups}
 
     def __iter__(self):
+        
         for idx in self.sampler:
+            if(isinstance(idx,list)):
+                idx = idx[0]
             group_id = self.group_ids[idx]
+            #print(group_id)
+            #print(self.buffer_per_group)
             group_buffer = self.buffer_per_group[group_id]
             group_buffer.append(idx)
+            #print(group_buffer)
             if len(group_buffer) == self.batch_size:
                 yield group_buffer[:]  # yield a copy of the list
                 del group_buffer[:]

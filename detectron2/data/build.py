@@ -343,6 +343,7 @@ def build_detection_train_loader(cfg, mapper=None):
     dataset = MapDataset(dataset, mapper)
 
     sampler_name = cfg.DATALOADER.SAMPLER_TRAIN
+    
     logger = logging.getLogger(__name__)
     logger.info("Using training sampler {}".format(sampler_name))
     if sampler_name == "TrainingSampler":
@@ -351,16 +352,30 @@ def build_detection_train_loader(cfg, mapper=None):
         sampler = samplers.RepeatFactorTrainingSampler(
             dataset_dicts, cfg.DATALOADER.REPEAT_THRESHOLD
         )
+    elif sampler_name =="GroupedSampler":
+        group_ids = []
+        for i in range(int(dataset.__len__()/4)):
+            group_ids.append(i)
+            group_ids.append(i)
+            group_ids.append(i)
+            group_ids.append(i)
+        sampler_org = samplers.TrainingSampler(int(len(dataset)/4))
+        sampler = samplers.GroupedBatchSampler(sampler_org,list(group_ids),4)
     else:
         raise ValueError("Unknown training sampler: {}".format(sampler_name))
     batch_sampler = build_batch_data_sampler(
         sampler, images_per_worker, group_bin_edges, aspect_ratios
     )
 
+    #return torch.utils.data.DataLoader(
+        #dataset, num_workers = cfg.DATALOADER.NUM_WORKERS, batch_sampler = batch_sampler,collate_fn=trivial_batch_collator,
+         #worker_init_fn=worker_init_reset_seed)
     data_loader = torch.utils.data.DataLoader(
         dataset,
-        num_workers=cfg.DATALOADER.NUM_WORKERS,
-        batch_sampler=batch_sampler,
+        num_workers=1,
+        batch_size=8,
+        #batch_sampler=batch_sampler,
+        shuffle = False,
         collate_fn=trivial_batch_collator,
         worker_init_fn=worker_init_reset_seed,
     )
