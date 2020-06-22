@@ -97,10 +97,12 @@ class VideoRCNN(nn.Module):
         labels_total = []
         pairs_used = batched_inputs[0]['pairs_used']
      
-        
+        classes_total = []
         for x in batched_inputs:
                 
             labels_total.append(x['ids'])
+            classes_total.append(x['classes'])
+        
         if self.proposal_generator:
             proposals, proposal_losses = self.proposal_generator(images, features, gt_instances)
        
@@ -111,7 +113,7 @@ class VideoRCNN(nn.Module):
             
             
        
-        _, detector_losses = self.roi_heads(images, features, proposals, gt_instances,labels = labels_total,pairs_used = pairs_used)
+        _, detector_losses = self.roi_heads(images, features, proposals, gt_instances,labels = labels_total,classes = classes_total,pairs_used = pairs_used)
 
         losses = {}
         losses.update(detector_losses)

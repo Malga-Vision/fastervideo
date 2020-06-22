@@ -19,7 +19,8 @@ class Track(Detection):
         self.tracked_count = 1
         self.hog = det.hog
         self.frame_gray = frame_gray
-        
+        self.old_center = []
+        self.old_slope = 0
         self.major_color=major_color
         
         
@@ -132,7 +133,7 @@ class Track(Detection):
         self.missed_count = 0
         self.tracked_count +=1
         
-        
+        self.old_center = self.center()
         if(len(det.major_color)>0 and len(self.major_color)>0):
             self.major_color[0] = (det.major_color[0]+4*self.major_color[0])/5
         if(self.is_overlap==False):
@@ -165,6 +166,9 @@ class Track(Detection):
         self.predict(prev_frame_gray,frame_gray)
         #desc_dist = np.linalg.norm(self.hog-get_hog_descriptor(frame_gray,self.pred_xmin,self.pred_ymin,self.pred_xmax,self.pred_ymax),ord=1)
         #if(desc_dist<0.15):
+        
+        self.old_center = self.center()
+        
         if(self.tracked_count>5):
             self.xmin = self.pred_xmin
             self.ymin = self.pred_ymin
@@ -175,6 +179,12 @@ class Track(Detection):
             self.ymin = self.pred_ymin
             self.xmax = self.pred_xmax
             self.ymax = self.pred_ymax
+        vec = self.center() - self.old_center
+        if(vec[0]==0):
+            self.old_slope = 999
+        else:
+            self.old_slope = vec[1]/vec[0]
+        
 
     def draw_own_mask(self,mask):
         cv.rectangle(mask, (int(self.xmin), int(self.ymin)), (int(self.xmax), int(self.ymax)), (255, 255, 255), -1)

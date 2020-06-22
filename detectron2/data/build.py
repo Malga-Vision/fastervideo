@@ -373,7 +373,7 @@ def build_detection_train_loader(cfg, mapper=None):
     data_loader = torch.utils.data.DataLoader(
         dataset,
         num_workers=1,
-        batch_size=8,
+        batch_size=4,
         #batch_sampler=batch_sampler,
         shuffle = False,
         collate_fn=trivial_batch_collator,

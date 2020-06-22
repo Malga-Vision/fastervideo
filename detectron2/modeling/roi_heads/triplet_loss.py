@@ -78,6 +78,20 @@ def _get_anchor_positive_triplet_mask(labels):
 
     return mask
 
+def _get_anchor_negative_triplet_mask_classes(labels,classes):
+    """Return a 2D mask where mask[a, n] is True iff a and n have distinct labels.
+    Args:
+        labels: torch.Tensor with shape [batch_size]
+    Returns:
+        mask: Variable with torch.ByteTensor with shape [batch_size, batch_size]
+    """
+    # Check if labels[i] != labels[k]
+    # Uses broadcasting where the 1st argument has shape (1, batch_size) and the 2nd (batch_size, 1)
+    labels_equal = torch.eq(torch.unsqueeze(labels, 0), torch.unsqueeze(labels, 1))
+    classes_equal = torch.eq(torch.unsqueeze(classes, 0), torch.unsqueeze(classes, 1))
+    mask = ~labels_equal & classes_equal
+
+    return mask
 
 def _get_anchor_negative_triplet_mask(labels):
     """Return a 2D mask where mask[a, n] is True iff a and n have distinct labels.

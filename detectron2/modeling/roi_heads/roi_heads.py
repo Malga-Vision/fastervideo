@@ -590,7 +590,7 @@ class StandardROIHeads(ROIHeads):
             cfg, ShapeSpec(channels=in_channels, width=pooler_resolution, height=pooler_resolution)
         )
 
-    def forward(self, images, features, proposals, targets=None,labels = None,pairs_used = None):
+    def forward(self, images, features, proposals, targets=None,labels = None,pairs_used = None,classes= None):
         """
         See :class:`ROIHeads.forward`.
         """
@@ -607,7 +607,7 @@ class StandardROIHeads(ROIHeads):
             # used by the mask, keypoint (and densepose) heads.
             losses.update(self._forward_mask(features_list, proposals))
             losses.update(self._forward_keypoint(features_list, proposals))
-            losses.update(self._forward_reid(features_list, targets,labels,pairs_used))
+            losses.update(self._forward_reid(features_list, targets,labels,pairs_used,classes))
             return proposals, losses
         else:
             pred_instances,desc,desc_pooled = self._forward_box(features_list, proposals)
@@ -655,10 +655,12 @@ class StandardROIHeads(ROIHeads):
             
             return  self.reid_head(box_features)
         
-    def _forward_reid(self,features,proposals,labels,pairs_used):
+    def _forward_reid(self,features,proposals,labels,pairs_used,classes_total):
         if(self.training):
             props = [x.gt_boxes for x in proposals]
             classes = [x.gt_classes for x in proposals]
+            
+           
             fin_props = []
             i =0
 
@@ -666,13 +668,13 @@ class StandardROIHeads(ROIHeads):
             #for l in labels:
                 #both = both.intersection(l)
 
-
+            mod_classes = []
             mod_labels = []
             for v in labels:
                 indices = [v.index(x) for x in pairs_used if x in v]
                 mod_labels += [x for x in pairs_used if x in v]
                 fin_props.append(props[i][indices])
-
+                mod_classes+=list(np.array(classes_total[i])[indices])
                 i+=1
 
             box_features = self.box_pooler(features, fin_props)
@@ -690,10 +692,7 @@ class StandardROIHeads(ROIHeads):
                 print(props)
                 print(labels)
             #print(mod_labels)
-            pos_indices = [idx for idx, element in enumerate(mod_labels) if element > 0]
-            neg_indices = [idx for idx, element in enumerate(mod_labels) if element < 0]
-            first_part = 0
-            second_part = 0
+           
             
             #if(len(neg_indices)>0):
                 #first_part =  self.reid_head.sum_losses(box_features[neg_indices],torch.tensor([mod_labels[i] for i in neg_indices]).to('cuda:0'),'batch_hard',0.2,True)
@@ -715,7 +714,8 @@ class StandardROIHeads(ROIHeads):
                     
                     #final = second_part
             #return final
-            return self.reid_head.sum_losses(box_features,torch.tensor(mod_labels).to('cuda:0'),'batch_hard',0.2,True)
+           
+            return self.reid_head.sum_losses(box_features,torch.tensor(mod_labels).to('cuda:0'),torch.tensor(mod_classes).to('cuda:0'),'batch_hard',0.2,True)
         else:
             box_features = self.box_pooler(features, [x.proposal_boxes for x in proposals])
             return  self.reid_head(box_features)

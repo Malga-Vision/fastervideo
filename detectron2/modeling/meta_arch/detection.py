@@ -9,6 +9,7 @@ class Detection(object):
         self.conf = float(conf)
         self.pred_class = pred_class
         self.major_color = []
+        self.hog = None
         self.descriptor = np.array(list(map(float,desc)))
         
     def topleft(self):

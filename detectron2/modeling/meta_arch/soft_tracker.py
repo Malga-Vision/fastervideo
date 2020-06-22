@@ -17,7 +17,7 @@ from .track import Track
 import torch
 
 
-class Tracker(object):
+class SoftTracker(object):
     def __init__(self,method='kalman_acc'):
         self.tracking_method = method
         
@@ -30,7 +30,45 @@ class Tracker(object):
         self.feature_params=dict(maxCorners=200,qualityLevel=0.3,minDistance=7,blockSize=7)
         self.lk_params=dict(winSize=(15,15),maxLevel=2,criteria=(cv.TERM_CRITERIA_EPS|cv.TERM_CRITERIA_COUNT,10,0.03))
         self.flow_time=0
-    
+    def get_iou_distance_matrix(self,dets,tracks,frame):
+        dists = np.zeros((len(dets),len(tracks)),np.float32)
+        for itrack in range(len(tracks)):
+            for ipred in range(len(dets)):
+                desc_dist=0
+                if(self.use_appearance==True):
+                    
+                    if(self.embed==True or self.reid==True):
+                        if(self.dist=='cosine'):
+                            desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
+                            #desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
+                        #print(dets[ipred].descriptor.shape)
+                        #print(tracks[itrack].descriptor.shape)
+                        #
+                        else:
+                            desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
+                        #print(len(dets[ipred].descriptor))
+                        #print(desc_dist)
+                        #print(desc_dist)
+                    else:
+                        
+                        desc_dist = np.linalg.norm(dets[ipred].hog-tracks[itrack].hog, ord=1)/self.dist_thresh
+                       
+                        #desc_dist = np.linalg.norm(np.array(dets[ipred].major_color)-np.array(self.tracks[itrack].major_color))/2
+                
+                iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
+                iou_dist = 1-iou_overlap
+                #iou_dist = 0
+                self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
+                #uncertainety =np.maximum(1-dets[ipred].conf,0.5)
+                total_dist = iou_dist 
+            
+                #if(desc_dist>8):
+                    #total_dist = total_dist +1.0
+                dists[ipred,itrack] = total_dist
+                #print(iou_dist,desc_dist)
+                
+                #dists[ipred,itrack] = ((1-iou_overlap)+desc_dist)
+        return dists
     def get_distance_matrix(self,dets,tracks,frame):
         
         dists = np.zeros((len(dets),len(tracks)),np.float32)
@@ -56,25 +94,13 @@ class Tracker(object):
                         desc_dist = np.linalg.norm(dets[ipred].hog-tracks[itrack].hog, ord=1)/self.dist_thresh
                        
                         #desc_dist = np.linalg.norm(np.array(dets[ipred].major_color)-np.array(self.tracks[itrack].major_color))/2
-                dir_dist = 0
-                if(tracks[itrack].tracked_count>3):
-                    det_slope = dets[ipred].center() - tracks[itrack].old_center
-
-                    
-                    cur_vec = tracks[itrack].center() - tracks[itrack].old_center
-                    unit_vector_1 = det_slope / np.linalg.norm(det_slope)
-                    unit_vector_2 = cur_vec / np.linalg.norm(cur_vec)
-                    dot_product = np.dot(unit_vector_1, unit_vector_2)
-                    angle = np.arccos(dot_product)
-                    dir_dist = abs(angle)/self.angle_norm
+                
                 iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
                 iou_dist = 1-iou_overlap
                 #iou_dist = 0
                 self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
                 #uncertainety =np.maximum(1-dets[ipred].conf,0.5)
-                if(math.isnan(dir_dist)):
-                    dir_dist = 0
-                total_dist = iou_dist +desc_dist + dir_dist
+                total_dist = iou_dist +desc_dist
             
                 #if(desc_dist>8):
                     #total_dist = total_dist +1.0
@@ -133,22 +159,22 @@ class Tracker(object):
             track_class = [t for t in self.tracks if t.pred_class == pred_class]
             
             dists = self.get_distance_matrix(dets_class,track_class,frame_gray)
+            dists_iou = self.get_iou_distance_matrix(dets_class,track_class,frame_gray)
+            det_indices,track_indices = linear_sum_assignment(dists)
+            global_used_dets = []
             
-            r,c = linear_sum_assignment(dists)
-            
-            for ri,rval in enumerate(r):
+            for ri,rval in enumerate(det_indices):
                 limit = 1.2
                 if(self.use_appearance==True):
                     limit  =1.2
-                if(dists[r[ri],c[ri]]>limit):
+                if(dists[det_indices[ri],track_indices[ri]]>limit):
                  
                       
-                  r[ri] = -1
-                  c[ri] = -1
-             
+                  det_indices[ri] = -1
+                  track_indices[ri] = -1
             for t,trk in enumerate(track_class):
                 
-                if(t not in c ):
+                if(t not in track_indices ):
                     
                     trk.matched = False
                     trk.missed_count+=1
@@ -168,10 +194,34 @@ class Tracker(object):
                             if(ios(trk.corners(),others.corners())>=self.overlap_threshold):
                                 trk.is_overlap = True
                                 break
-                    trk.update(dets_class[np.where(c==t)[0][0]],frame_gray,prev_gray)
-                    matched +=1
+                    
+                    det_index = np.where(track_indices==t)[0][0]
+                    dist_min_iou = dists_iou[det_index,t]
+                    if(dist_min_iou>0.99):
+                        continue
+                    dist_min  =dists[det_index,t]
+                    candidate_detections = [] 
+                    weights  =[]
+                    for c_id,d in enumerate(dists[:,t]):
+    
+                        if(d/dist_min >=0.99 and d/dist_min<self.soft_thresh and dists_iou[c_id,t]<1):
+                            candidate_detections.append(c_id)
+                            weights.append(1/d)
+                            global_used_dets.append(c_id)
+                    if(len(candidate_detections)>0):
+                       
+                        
+                        avg_conf = np.average([dets_class[c_id].conf for c_id in candidate_detections], weights = weights)
+                        avg_descriptor = np.average([dets_class[c_id].descriptor for c_id in candidate_detections],axis=0,weights = weights)
+                        avg_xmin = np.average([dets_class[c_id].xmin for c_id in candidate_detections],weights = weights)
+                        avg_ymin = np.average([dets_class[c_id].ymin for c_id in candidate_detections],weights = weights)
+                        avg_xmax = np.average([dets_class[c_id].xmax for c_id in candidate_detections],weights = weights)
+                        avg_ymax = np.average([dets_class[c_id].ymax for c_id in candidate_detections],weights = weights)
+                        
+                        trk.update(Detection(avg_conf,[avg_xmin,avg_ymin,avg_xmax,avg_ymax],pred_class,avg_descriptor),frame_gray,prev_gray)
+                        matched +=1
             for d,det in enumerate(dets_class):
-                if(d not in r and det.conf>0.6):
+                if(not (d in det_indices or d in global_used_dets) and  det.conf>0.6):
                     missed_dets+=1
                     
                     self.tracks.append(Track(self.tracking_method,self.cur_id,det,frame_gray,measurement_noise = self.measurement_noise,process_noise = self.process_noise))

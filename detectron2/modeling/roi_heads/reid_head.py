@@ -21,7 +21,7 @@ import random
 import cv2
 import math
 
-from .triplet_loss import _get_anchor_positive_triplet_mask, _get_anchor_negative_triplet_mask, _get_triplet_mask
+from .triplet_loss import _get_anchor_positive_triplet_mask, _get_anchor_negative_triplet_mask, _get_triplet_mask, _get_anchor_negative_triplet_mask_classes
 
 ROI_REID_HEAD_REGISTRY = Registry("ROI_REID_HEAD")
 ROI_REID_HEAD_REGISTRY.__doc__ = """
@@ -58,11 +58,15 @@ class REID_HEAD(nn.Module):
 
         #self._output_size = (input_shape.channels, input_shape.height, input_shape.width)
         self._output_size = 128
+        #self.bottle_neck = nn.Conv2d(256,128,3)
+        #self.bottle_neck_2 = nn.Conv2d(128,64,3)
         self.fc = nn.Linear(7*7*256,512)
         self.bn_fc = nn.BatchNorm1d(512)
         self.relu_fc = nn.ReLU(inplace=True)
-       
-        
+        #self.fc_compare = nn.Linear(576,1)
+        #weight_init.c2_xavier_fill(self.bottle_neck)
+        #weight_init.c2_xavier_fill(self.bottle_neck_2)
+        #weight_init.c2_xavier_fill(self.fc_compare)
         self.fc_out = nn.Linear(512,128)
         self.fc_compare = nn.Linear(128, 1)
         
@@ -72,6 +76,14 @@ class REID_HEAD(nn.Module):
         weight_init.c2_xavier_fill(self.fc_compare)
 
     def forward(self, x):
+        
+        
+        #x = self.bottle_neck(x)
+        #x = self.bn_fc(x)
+        #x = self.relu_fc(x)
+        #x = self.bottle_neck_2(x)
+        #x = self.relu_fc(x)
+        #x = x.view(x.size(0), -1)
         
         x = x.view(x.size(0), -1)
         x = self.fc(x)
@@ -91,7 +103,7 @@ class REID_HEAD(nn.Module):
         return out
     
     
-    def sum_losses(self,features,labels, loss, margin, prec_at_k):
+    def sum_losses(self,features,labels,classes, loss, margin, prec_at_k):
         """For Pretraining
 
         Function for preatrainind this CNN with the triplet loss. Takes a sample of N=PK images, P different
@@ -109,7 +121,7 @@ class REID_HEAD(nn.Module):
         
         labels = Variable(labels).cuda()
         #print(labels[0:10])
-        #print(labels)
+      
         
         
        
@@ -174,7 +186,7 @@ class REID_HEAD(nn.Module):
             mask_anchor_positive = _get_anchor_positive_triplet_mask(labels).float()
             
             #print(mask_anchor_positive[0:10])
-            mask_anchor_negative = _get_anchor_negative_triplet_mask(labels).float()
+            mask_anchor_negative = _get_anchor_negative_triplet_mask_classes(labels,classes).float()
             
             #print(mask_anchor_negative[0:10])
             #print(mask_anchor_positive.shape)
@@ -194,7 +206,7 @@ class REID_HEAD(nn.Module):
                 pos = torch.max(pos_dist[i],0)[1].item()
                 neg = torch.min(neg_dist[i],0)[1].item()
                 triplets.append((i, pos, neg))
-            print(triplets[0])
+            
 
             e0 = []
             e1 = []
@@ -280,5 +292,5 @@ def build_reid_head(cfg, input_shape):
     Build a box head defined by `cfg.MODEL.ROI_BOX_HEAD.NAME`.
     """
     name = "ROI_REID_HEAD"
-    print(ROI_REID_HEAD_REGISTRY)
+    
     return REID_HEAD(cfg, input_shape)
