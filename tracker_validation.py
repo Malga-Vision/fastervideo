@@ -232,7 +232,7 @@ for setting in settings:
       out_tracking = cv2.VideoWriter('debug_kitti.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, dump_image.shape[1::-1])
       predictor = DefaultPredictor(cfg)
       #prop_limit=60
-      predictor.model.tracker = SoftTracker()
+      predictor.model.tracker = Tracker()
       print(folder_name)
       predictor.model.tracking_proposals = setting['T']
       predictor.model.tracker.track_life = setting['track_life']
