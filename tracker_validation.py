@@ -39,7 +39,7 @@ from detectron2.modeling.meta_arch.soft_tracker import SoftTracker
 
 cfg = get_cfg()
 #cfg.MODEL.DEVICE='cpu'
-cfg.merge_from_file("./detectron2_repo/configs/COCO-Detection/faster_rcnn_R_50_FPN_3x_Video.yaml")
+cfg.merge_from_file("detectron2_repo/configs/COCO-Detection/faster_rcnn_R_50_FPN_3x_Video.yaml")
 #cfg.merge_from_file("./detectron2_repo/configs/COCO-Detection/faster_rcnn_R_50_Video.yaml")
 
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.4  # set threshold for this model
@@ -178,6 +178,10 @@ colors = [[0,0,128],[0,255,0],[0,0,255],[255,0,0],[0,128,128],[128,0,128],[128,1
 dirC = '/media/DATA/Datasets/KITTI/tracking/data_tracking_image_2/training/image_02/'
 names = []
 
+
+
+
+
 output_path = '../../devkit_tracking/python/results/'
 settings = [
    
@@ -185,12 +189,12 @@ settings = [
     
     #dict(props=20,st=1.05,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
     
-    dict(props=20,st=1.05,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
+    #dict(props=20,st=1.05,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
     dict(props=20,st=1.1,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
-    dict(props=20,st=1.15,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
-    dict(props=20,st=1.2,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
-    dict(props=20,st=1.25,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
-    dict(props=20,st=1.3,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
+    #dict(props=20,st=1.15,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
+    #dict(props=20,st=1.2,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
+    #dict(props=20,st=1.25,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
+    #dict(props=20,st=1.3,an=3,T=True,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
     
     #dict(props=20,T=False,D='cosine',Re=True,A=True,H=False,K=True,E=False,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
     #dict(props=20,T=True,D='cosine',Re=False,A=True,H=False,K=True,E=True,O=False,overlap_threshold = 0.6,measurement=0.001,process=1,hog_cells=4,dist_thresh=1.5,track_life=7,track_vis=2),
@@ -206,7 +210,7 @@ train_folders = ['0000','0002','0003','0004','0005','0009','0011','0017','0020']
 val_folders = ['0001','0006','0008','0016','0018','0019']
 test_folders_2 = ['0002','0007','0009','0013','0016','0017','0018','0019']
 test_folders = ['0014','0015','0016','0018','0019','0001','0006','0008','0010','0012','0013']
-debug_folders = ['0001']
+debug_folders = ['0002']
 submission_folders = ['0000','0001','0002','0003','0004','0005','0006','0007',
                       '0008','0009','0010','0011','0012','0013','0014','0015','0016','0017',
                       '0018','0019','0020','0021','0022','0023','0024','0025','0026','0027','0028']
