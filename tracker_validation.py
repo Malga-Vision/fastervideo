@@ -137,7 +137,7 @@ def print_debug_results(results_name):
 
     with suppress_stdout():
         print("Now you don't")
-        os.system('python2 ../devkit_tracking/python/debug_tracking.py debug')
+        os.system('python2 ../../devkit_tracking/python/debug_tracking.py debug')
     
     
     labels = {1:'MOTA',2:'MOTP',3:'MOTAL',4:'MODA',5:'MODP',7:'R',8:'P',12:'MT',13:'PT',14:'ML',18:'FP',19:'FN',22:'IDs'}
@@ -232,7 +232,7 @@ for setting in settings:
       out_tracking = cv2.VideoWriter('debug_kitti.avi',cv2.VideoWriter_fourcc('M','J','P','G'), 30, dump_image.shape[1::-1])
       predictor = DefaultPredictor(cfg)
       #prop_limit=60
-      predictor.model.tracker = Tracker()
+      predictor.model.tracker = SoftTracker()
       print(folder_name)
       predictor.model.tracking_proposals = setting['T']
       predictor.model.tracker.track_life = setting['track_life']
