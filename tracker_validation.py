@@ -44,7 +44,7 @@ cfg.merge_from_file("configs/COCO-Detection/faster_rcnn_R_50_FPN_3x_Video.yaml")
 
 cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.4  # set threshold for this model
 #cfg.MODEL.WEIGHTS = "KITTI_FPN_FINAL/model_final.pth"
-cfg.MODEL.WEIGHTS = "../models/kitti_jde.pth"
+cfg.MODEL.WEIGHTS = "../../models/kitti_jde.pth"
 
 print(cfg.MODEL)
 #arr = {1:'cyclist',2:'car',0:'pedestrian'}
