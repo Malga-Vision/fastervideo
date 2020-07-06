@@ -172,6 +172,14 @@ class Tracker(object):
                     matched +=1
             for d,det in enumerate(dets_class):
                 if(d not in r and det.conf>0.6):
+                    possible_fp = False
+                    for t,trk in enumerate(track_class):
+                        if(ios(det.corners(),trk.corners())>0.4):
+                            possible_fp = True
+                            break
+                    if(possible_fp == True):
+                        print('cancelled')
+                        continue
                     missed_dets+=1
                     
                     self.tracks.append(Track(self.tracking_method,self.cur_id,det,frame_gray,measurement_noise = self.measurement_noise,process_noise = self.process_noise))

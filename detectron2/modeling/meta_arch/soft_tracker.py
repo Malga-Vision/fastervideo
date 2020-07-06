@@ -27,6 +27,7 @@ class SoftTracker(object):
         self.detect_interval=3
         self.track_len = 10
         self.distances = []
+        self.cand_det = []
         self.feature_params=dict(maxCorners=200,qualityLevel=0.3,minDistance=7,blockSize=7)
         self.lk_params=dict(winSize=(15,15),maxLevel=2,criteria=(cv.TERM_CRITERIA_EPS|cv.TERM_CRITERIA_COUNT,10,0.03))
         self.flow_time=0
@@ -210,7 +211,7 @@ class SoftTracker(object):
                             global_used_dets.append(c_id)
                     if(len(candidate_detections)>0):
                        
-                        
+                        self.cand_det.append(len(candidate_detections))
                         avg_conf = np.average([dets_class[c_id].conf for c_id in candidate_detections], weights = weights)
                         avg_descriptor = np.average([dets_class[c_id].descriptor for c_id in candidate_detections],axis=0,weights = weights)
                         avg_xmin = np.average([dets_class[c_id].xmin for c_id in candidate_detections],weights = weights)
