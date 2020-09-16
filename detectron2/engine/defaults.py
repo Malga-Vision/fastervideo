@@ -147,9 +147,10 @@ class DefaultPredictor:
             cfg.DATASETS.TEST.
     """
 
-    def __init__(self, cfg):
+    def __init__(self, cfg,is_video = False):
         self.cfg = cfg.clone()  # cfg can be modified by model
         self.model = build_model(self.cfg)
+        self.model.is_video = is_video
         self.model.eval()
         self.metadata = MetadataCatalog.get(cfg.DATASETS.TEST[0])
 
@@ -177,7 +178,7 @@ class DefaultPredictor:
         predictions = self.model([inputs],detected_instances = props)
         return predictions
     @torch.no_grad()
-    def __call__(self, original_image,prop_limit,max_distance,detections =None ):
+    def __call__(self, original_image,prop_limit,max_distance=0,detections =None ):
         """
         Args:
             original_image (np.ndarray): an image of shape (H, W, C) (in BGR order).
