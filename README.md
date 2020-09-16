@@ -1,56 +1,38 @@
-<img src=".github/Detectron2-Logo-Horz.svg" width="300" >
+# FasterVideo for efficient joint detection and tracking
+This repository is based on Detectron2 from FAIR 
+https://github.com/facebookresearch/detectron2
 
-Detectron2 is Facebook AI Research's next generation software system
-that implements state-of-the-art object detection algorithms.
-It is a ground-up rewrite of the previous version,
-[Detectron](https://github.com/facebookresearch/Detectron/),
-and it originates from [maskrcnn-benchmark](https://github.com/facebookresearch/maskrcnn-benchmark/).
+This code performs joint detection and tracking for object tracking tasks.
+Using Faster R-CNN and an additional Embeddings head (trained using triplet loss) the method is trained and tested on several datasets and benchmarks (KITTI, MOT17, MOT20)
 
-<div align="center">
-  <img src="https://user-images.githubusercontent.com/1381301/66535560-d3422200-eace-11e9-9123-5535d469db19.png"/>
-</div>
+## Results:
 
-### What's New
-* It is powered by the [PyTorch](https://pytorch.org) deep learning framework.
-* Includes more features such as panoptic segmentation, densepose, Cascade R-CNN, rotated bounding boxes, etc.
-* Can be used as a library to support [different projects](projects/) on top of it.
-  We'll open source more research projects in this way.
-* It [trains much faster](https://detectron2.readthedocs.io/notes/benchmarks.html).
-
-See our [blog post](https://ai.facebook.com/blog/-detectron2-a-pytorch-based-modular-object-detection-library-/)
-to see more demos and learn about detectron2.
-
-## Installation
-
-See [INSTALL.md](INSTALL.md).
-
-## Quick Start
-
-See [GETTING_STARTED.md](GETTING_STARTED.md),
-or the [Colab Notebook](https://colab.research.google.com/drive/16jcaJoc6bCFAQ96jDe2HwtXj7BMD_-m5).
-
-Learn more at our [documentation](https://detectron2.readthedocs.org).
-And see [projects/](projects/) for some projects that are built on top of detectron2.
-
-## Model Zoo and Baselines
-
-We provide a large set of baseline results and trained models available for download in the [Detectron2 Model Zoo](MODEL_ZOO.md).
+### KITTI
+|Method|MOTA|MOTP|P|R|IDs|FPS|
+|---|---|---|---|---|----|----|
+|FasterVideo|79.3|78.6|94.6|87.5|287|8.8|
+|Tracktor++|80.2|82.1|97.9|84.4|68|2.8|
+|MOTBP|84.2|85.7|98|90.5|293|1.6*|
+|TuSimple|86.6|84|97.9|88.8|468|3.3*|
+|SORT|54.2|77.57|92.87|60.80|1|454*|
 
 
-## License
+### MOT17
+|Method|IDF1|MOTA|MOTP|P|R|IDs|FPS|
+|---|---|---|---|---|----|----|----|
+|FasterVideo|49.9|45.1|77|88.3|58.1|5589|9|
+|Tracktor++|52.3|53.9|78.9|96.2|54.9|2152|1.8|
+|SORT|43.1|39.8|77.8|90.7|49|4852|143*|
 
-Detectron2 is released under the [Apache 2.0 license](LICENSE).
+### MOT20
+|Method|IDF1|MOTA|MOTP|P|R|IDs|FPS|
+|---|---|---|---|---|----|----|----|
+|FasterVideo|44.7|39.1|76.2|92.5|49.5|4171|0.8|
+|Tracktor++|50.8|52.1|76.8|84.7|62.7|2751|0.2*|
+|SORT|42.7|45.1|78.5|90.2|48.8|4470|57.3*|
 
-## Citing Detectron
-
-If you use Detectron2 in your research or wish to refer to the baseline results published in the [Model Zoo](MODEL_ZOO.md), please use the following BibTeX entry.
-
-```BibTeX
-@misc{wu2019detectron2,
-  author =       {Yuxin Wu and Alexander Kirillov and Francisco Massa and
-                  Wan-Yen Lo and Ross Girshick},
-  title =        {Detectron2},
-  howpublished = {\url{https://github.com/facebookresearch/detectron2}},
-  year =         {2019}
-}
-```
+## Usage:
+Create your python environment, requirements are usual packages, make sure to include pytorch and torchvision
+Take a look at the notebooks available in the folder notebooks, which will guide through training and evaluation of the  method
+### Data
+You need to download the datasets and store them in the datasets folder under the correct subfolder maintaining the default hierarchy.
