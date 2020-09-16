@@ -10,6 +10,7 @@ since they are meant to represent the "common default behavior" people need in t
 """
 
 import argparse
+import numpy as np
 import logging
 import os
 from collections import OrderedDict
@@ -24,6 +25,7 @@ from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.data import (
     MetadataCatalog,
     build_detection_test_loader,
+    build_detection_train_loader_joint,
     build_detection_train_loader,
 )
 from detectron2.evaluation import (
@@ -175,7 +177,7 @@ class DefaultPredictor:
         predictions = self.model([inputs],detected_instances = props)
         return predictions
     @torch.no_grad()
-    def __call__(self, original_image,prop_limit,max_distance):
+    def __call__(self, original_image,prop_limit,max_distance,detections =None ):
         """
         Args:
             original_image (np.ndarray): an image of shape (H, W, C) (in BGR order).
@@ -194,12 +196,19 @@ class DefaultPredictor:
         inputs = {"image": image, "height": height, "width": width}
         self.model.props_limit=prop_limit
         self.model.max_distance = max_distance
-        
-        #merged_boxes = torch.from_numpy(detected_instances).float().to('cuda')
-        
+        if(not (detections is None)):
+            boxes = np.array([v[0:4] for v in detections])
+            merged_boxes = torch.from_numpy(boxes).float().to('cuda')
+            scores = np.array([v[4] for v in detections])
+            scores = torch.from_numpy(scores).float().to('cpu')
                     
-        
-        #props = Instances(original_image.shape[:2],proposal_boxes = Boxes(merged_boxes))
+            pred_classes = np.zeros(scores.shape[0])
+            
+            
+            pred_classes = torch.from_numpy(pred_classes).float().to('cpu')
+            props = Instances(original_image.shape[:2],proposal_boxes = Boxes(merged_boxes),pred_boxes = Boxes(merged_boxes),scores = scores,pred_classes = pred_classes)
+            predictions = self.model([inputs],detected_instances = props)
+            return predictions
         predictions = self.model([inputs])#,detected_instances = props)
         return predictions
 
@@ -239,15 +248,19 @@ class DefaultTrainer(SimpleTrainer):
         cfg (CfgNode):
     """
 
-    def __init__(self, cfg):
+    def __init__(self, cfg,is_video_data = False):
         """
         Args:
             cfg (CfgNode):
         """
         # Assume these objects must be constructed in this order.
-        model = self.build_model(cfg)
+        model = self.build_model(cfg,is_video_data)
+        
         optimizer = self.build_optimizer(cfg, model)
-        data_loader = self.build_train_loader(cfg)
+        if(is_video_data == True):
+            data_loader = self.build_train_loader_joint(cfg)
+        else:
+            data_loader = self.build_train_loader(cfg)
 
         # For training, wrap with DDP. But don't need this for inference.
         if comm.get_world_size() > 1:
@@ -380,7 +393,7 @@ class DefaultTrainer(SimpleTrainer):
             return self._last_eval_results
 
     @classmethod
-    def build_model(cls, cfg):
+    def build_model(cls, cfg,is_video):
         """
         Returns:
             torch.nn.Module:
@@ -389,6 +402,8 @@ class DefaultTrainer(SimpleTrainer):
         Overwrite it if you'd like a different model.
         """
         model = build_model(cfg)
+        model.is_video = is_video
+        #print('setting model is video to,', is_video)
         logger = logging.getLogger(__name__)
         logger.info("Model:\n{}".format(model))
         return model
@@ -423,6 +438,17 @@ class DefaultTrainer(SimpleTrainer):
         """
         #return DataLoader(db_train, batch_size=1, shuffle=True)
         return build_detection_train_loader(cfg)
+    @classmethod
+    def build_train_loader_joint(cls, cfg):
+        """
+        Returns:
+            iterable
+
+        It now calls :func:`detectron2.data.build_detection_train_loader`.
+        Overwrite it if you'd like a different data loader.
+        """
+        #return DataLoader(db_train, batch_size=1, shuffle=True)
+        return build_detection_train_loader_joint(cfg)
 
     @classmethod
     def build_test_loader(cls, cfg, dataset_name):

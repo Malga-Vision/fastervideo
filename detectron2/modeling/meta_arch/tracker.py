@@ -24,6 +24,7 @@ class Tracker(object):
         self.tracks = []
         self.cur_id=1
         self.frameCount =1
+        self.history_window = 3
         self.detect_interval=3
         self.track_len = 10
         self.distances = []
@@ -42,56 +43,38 @@ class Tracker(object):
                     if(self.embed==True or self.reid==True):
                         if(self.dist=='cosine'):
                             desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
-                            #desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
-                        #print(dets[ipred].descriptor.shape)
-                        #print(tracks[itrack].descriptor.shape)
-                        #
+                            (tracks[itrack].descriptor.shape)
+                        
                         else:
                             desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
-                        #print(len(dets[ipred].descriptor))
-                        #print(desc_dist)
-                        #print(desc_dist)
+                        
                     else:
                         
                         desc_dist = np.linalg.norm(dets[ipred].hog-tracks[itrack].hog, ord=1)/self.dist_thresh
                        
-                        #desc_dist = np.linalg.norm(np.array(dets[ipred].major_color)-np.array(self.tracks[itrack].major_color))/2
-                dir_dist = 0
-                if(tracks[itrack].tracked_count>3):
-                    det_slope = dets[ipred].center() - tracks[itrack].old_center
-
-                    
-                    cur_vec = tracks[itrack].center() - tracks[itrack].old_center
-                    unit_vector_1 = det_slope / np.linalg.norm(det_slope)
-                    unit_vector_2 = cur_vec / np.linalg.norm(cur_vec)
-                    dot_product = np.dot(unit_vector_1, unit_vector_2)
-                    angle = np.arccos(dot_product)
-                    dir_dist = abs(angle)/self.angle_norm
+                        
+                
+                
                 iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
                 iou_dist = 1-iou_overlap
-                #iou_dist = 0
-                self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
-                #uncertainety =np.maximum(1-dets[ipred].conf,0.5)
-                if(math.isnan(dir_dist)):
-                    dir_dist = 0
-                total_dist = iou_dist +desc_dist + dir_dist
-            
-                #if(desc_dist>8):
-                    #total_dist = total_dist +1.0
-                dists[ipred,itrack] = total_dist
-                #print(iou_dist,desc_dist)
                 
-                #dists[ipred,itrack] = ((1-iou_overlap)+desc_dist)
+                self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
+               
+                
+                total_dist = iou_dist +desc_dist 
+            
+                dists[ipred,itrack] = total_dist
+                
         return dists
     def get_predicted_tracks(self,frame_gray,prev_gray,scale_x,scale_y):
         adds = []
         for t,trk in enumerate(self.tracks):
             if(self.use_kalman==True):
                 if(trk.tracked_count>5):
-                    #print('happened')
+
                     trk.apply_prediction(None,None)
                 
-            #adds.append([trk.conf,trk.pred_xmin*0.9323,trk.pred_ymin*0.9310,trk.pred_xmax*0.9323,trk.pred_ymax*0.9310])
+            
             adds.append([trk.conf,trk.xmin,trk.ymin,trk.xmax,trk.ymax])
         return adds
     def filter_proposals(self,dets,frame_gray,prev_frame_gray):
@@ -127,7 +110,21 @@ class Tracker(object):
         list_classes = [d.pred_class for d in dets]
         list_classes_tracks = [d.pred_class for d in self.tracks]
         list_classes = list(set(list_classes).union(set(list_classes_tracks)))
-        #print(list_classes)
+        
+        for trk in self.tracks:
+            trk.occluded  = False
+        for trk in self.tracks:
+            for others in self.tracks:
+                if(trk.track_id==others.track_id or not (trk.pred_class == others.pred_class)):
+                    continue
+                if(ios(trk.corners(),others.corners())>=1):
+                    if(others.ymax>= trk.ymax):
+                        
+                        trk.occluded = True
+                    
+                    break
+     
+
         for pred_class in list_classes:
             dets_class = [d for d in dets if d.pred_class == pred_class]
             track_class = [t for t in self.tracks if t.pred_class == pred_class]
@@ -137,7 +134,7 @@ class Tracker(object):
             r,c = linear_sum_assignment(dists)
             
             for ri,rval in enumerate(r):
-                limit = 1.2
+                limit = 0.75
                 if(self.use_appearance==True):
                     limit  =1.2
                 if(dists[r[ri],c[ri]]>limit):
@@ -174,28 +171,28 @@ class Tracker(object):
                 if(d not in r and det.conf>0.6):
                     possible_fp = False
                     for t,trk in enumerate(track_class):
-                        if(ios(det.corners(),trk.corners())>0.4):
+                        if(ios(det.corners(),trk.corners())>self.fp_thresh or iou(det.corners(),trk.corners())>0.7):
                             possible_fp = True
                             break
-                    if(possible_fp == True):
-                        print('cancelled')
-                        continue
+                    if(self.suppress_fp==True):
+                        if(possible_fp == True):
+                           
+                            continue
                     missed_dets+=1
                     
-                    self.tracks.append(Track(self.tracking_method,self.cur_id,det,frame_gray,measurement_noise = self.measurement_noise,process_noise = self.process_noise))
+                    self.tracks.append(Track(self.tracking_method,self.cur_id,det,frame_gray,measurement_noise = self.measurement_noise,process_noise = self.process_noise, embed_alpha = self.embed_alpha))
                     self.cur_id+=1
 
         self.frameCount+=1
         
     
     def get_display_tracks(self):
-        #for t in self.tracks:
-            #t.predict(None,None)
+        
        
     
         
         self.tracks = [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_life]
-
+        
         res =  [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_visibility]
         
         return res

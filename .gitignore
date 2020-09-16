@@ -23,7 +23,7 @@ dist/
 *.npy
 
 # ipython/jupyter notebooks
-*.ipynb
+#*.ipynb
 **/.ipynb_checkpoints/
 
 # Editor temporaries
@@ -37,5 +37,5 @@ dist/
 
 # project dirs
 /detectron2/model_zoo/configs
-/datasets
-/models
+#/datasets
+#/models

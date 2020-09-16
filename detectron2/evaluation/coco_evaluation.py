@@ -59,6 +59,7 @@ class COCOEvaluator(DatasetEvaluator):
             self._metadata.json_file = cache_path
 
         json_file = PathManager.get_local_path(self._metadata.json_file)
+        
         with contextlib.redirect_stdout(io.StringIO()):
             self._coco_api = COCO(json_file)
 
@@ -66,6 +67,7 @@ class COCOEvaluator(DatasetEvaluator):
         # Test set json files do not contain annotations (evaluation must be
         # performed using the COCO evaluation server).
         self._do_evaluation = "annotations" in self._coco_api.dataset
+        
 
     def reset(self):
         self._predictions = []
@@ -467,7 +469,7 @@ def _evaluate_predictions_on_coco(coco_gt, coco_results, iou_type, kpt_oks_sigma
 
     coco_dt = coco_gt.loadRes(coco_results)
     imgIds=sorted(sorted(coco_gt.getImgIds()))
-    imgIds=imgIds[0:500]
+    #imgIds=imgIds[0:20]
     coco_eval = COCOeval(coco_gt, coco_dt, iou_type)
     coco_eval.params.imgIds  = imgIds
     # Use the COCO default keypoint OKS sigmas unless overrides are specified

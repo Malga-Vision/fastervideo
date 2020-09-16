@@ -607,7 +607,8 @@ class StandardROIHeads(ROIHeads):
             # used by the mask, keypoint (and densepose) heads.
             losses.update(self._forward_mask(features_list, proposals))
             losses.update(self._forward_keypoint(features_list, proposals))
-            losses.update(self._forward_reid(features_list, targets,labels,pairs_used,classes))
+            if(self.is_video):
+            	losses.update(self._forward_reid(features_list, targets,labels,pairs_used,classes))
             return proposals, losses
         else:
             pred_instances,desc,desc_pooled = self._forward_box(features_list, proposals)
@@ -650,7 +651,7 @@ class StandardROIHeads(ROIHeads):
                 print(props)
                 print(labels)
             #print(mod_labels)
-            return self.reid_head.sum_losses(box_features,torch.tensor(mod_labels).to('cuda:0'),'batch_hard',0.2,True)
+            return self.reid_head.sum_losses(box_features,torch.tensor(mod_labels).to('cuda:0'),'batch_hard',0.2,False)
         else:
             
             return  self.reid_head(box_features)

@@ -282,8 +282,8 @@ class REID_HEAD(nn.Module):
             k_loss = torch.Tensor(1)
             k_loss[0] = num_hit / num_ges
             losses['prec_at_k'] = Variable(k_loss.cuda())
-        print(losses['prec_at_k'])
-        losses['reid_loss'] = total_loss*0.2
+        
+        losses['reid_loss'] = total_loss
 
         return losses
 

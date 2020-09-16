@@ -18,7 +18,7 @@ import torch
 
 
 class SoftTracker(object):
-    def __init__(self,method='kalman_acc'):
+    def __init__(self,method='kalman_vel'):
         self.tracking_method = method
         
         self.tracks = []
@@ -41,34 +41,25 @@ class SoftTracker(object):
                     if(self.embed==True or self.reid==True):
                         if(self.dist=='cosine'):
                             desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
-                            #desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
-                        #print(dets[ipred].descriptor.shape)
-                        #print(tracks[itrack].descriptor.shape)
-                        #
+                           
                         else:
                             desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
-                        #print(len(dets[ipred].descriptor))
-                        #print(desc_dist)
-                        #print(desc_dist)
+                       
                     else:
                         
                         desc_dist = np.linalg.norm(dets[ipred].hog-tracks[itrack].hog, ord=1)/self.dist_thresh
                        
-                        #desc_dist = np.linalg.norm(np.array(dets[ipred].major_color)-np.array(self.tracks[itrack].major_color))/2
+                        
                 
                 iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
                 iou_dist = 1-iou_overlap
-                #iou_dist = 0
+                
                 self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
-                #uncertainety =np.maximum(1-dets[ipred].conf,0.5)
+                
                 total_dist = iou_dist 
             
-                #if(desc_dist>8):
-                    #total_dist = total_dist +1.0
                 dists[ipred,itrack] = total_dist
-                #print(iou_dist,desc_dist)
                 
-                #dists[ipred,itrack] = ((1-iou_overlap)+desc_dist)
         return dists
     def get_distance_matrix(self,dets,tracks,frame):
         
@@ -81,44 +72,33 @@ class SoftTracker(object):
                     if(self.embed==True or self.reid==True):
                         if(self.dist=='cosine'):
                             desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
-                            #desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
-                        #print(dets[ipred].descriptor.shape)
-                        #print(tracks[itrack].descriptor.shape)
-                        #
+                           
                         else:
                             desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
-                        #print(len(dets[ipred].descriptor))
-                        #print(desc_dist)
-                        #print(desc_dist)
+                       
                     else:
                         
                         desc_dist = np.linalg.norm(dets[ipred].hog-tracks[itrack].hog, ord=1)/self.dist_thresh
                        
-                        #desc_dist = np.linalg.norm(np.array(dets[ipred].major_color)-np.array(self.tracks[itrack].major_color))/2
-                
+                        
                 iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
                 iou_dist = 1-iou_overlap
-                #iou_dist = 0
+                
                 self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
-                #uncertainety =np.maximum(1-dets[ipred].conf,0.5)
+                
                 total_dist = iou_dist +desc_dist
             
-                #if(desc_dist>8):
-                    #total_dist = total_dist +1.0
                 dists[ipred,itrack] = total_dist
-                #print(iou_dist,desc_dist)
-                
-                #dists[ipred,itrack] = ((1-iou_overlap)+desc_dist)
+            
         return dists
     def get_predicted_tracks(self,frame_gray,prev_gray,scale_x,scale_y):
         adds = []
         for t,trk in enumerate(self.tracks):
             if(self.use_kalman==True):
                 if(trk.tracked_count>5):
-                    #print('happened')
+                    
                     trk.apply_prediction(None,None)
-                
-            #adds.append([trk.conf,trk.pred_xmin*0.9323,trk.pred_ymin*0.9310,trk.pred_xmax*0.9323,trk.pred_ymax*0.9310])
+            
             adds.append([trk.conf,trk.xmin,trk.ymin,trk.xmax,trk.ymax])
         return adds
     def filter_proposals(self,dets,frame_gray,prev_frame_gray):
@@ -154,7 +134,7 @@ class SoftTracker(object):
         list_classes = [d.pred_class for d in dets]
         list_classes_tracks = [d.pred_class for d in self.tracks]
         list_classes = list(set(list_classes).union(set(list_classes_tracks)))
-        #print(list_classes)
+        
         for pred_class in list_classes:
             dets_class = [d for d in dets if d.pred_class == pred_class]
             track_class = [t for t in self.tracks if t.pred_class == pred_class]
@@ -224,17 +204,23 @@ class SoftTracker(object):
             for d,det in enumerate(dets_class):
                 if(not (d in det_indices or d in global_used_dets) and  det.conf>0.6):
                     missed_dets+=1
-                    
-                    self.tracks.append(Track(self.tracking_method,self.cur_id,det,frame_gray,measurement_noise = self.measurement_noise,process_noise = self.process_noise))
+                    possible_fp = False
+                    for t,trk in enumerate(track_class):
+                        if(ios(det.corners(),trk.corners())>self.fp_thresh or iou(det.corners(),trk.corners())>0.7):
+                            possible_fp = True
+                            break
+                    if(self.suppress_fp==True):
+                        if(possible_fp == True):
+                            
+                            continue
+                    self.tracks.append(Track(self.tracking_method,self.cur_id,det,frame_gray,measurement_noise = self.measurement_noise,process_noise = self.process_noise,embed_alpha = self.embed_alpha))
                     self.cur_id+=1
 
         self.frameCount+=1
         
     
     def get_display_tracks(self):
-        #for t in self.tracks:
-            #t.predict(None,None)
-       
+        
     
         
         self.tracks = [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_life]

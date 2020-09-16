@@ -17,7 +17,7 @@ from .build import META_ARCH_REGISTRY
 from scipy.cluster.hierarchy import dendrogram, linkage,fcluster
 from sklearn.preprocessing import normalize
 import time
-from .reid import LightWeight
+
 import cv2 as cv2
 __all__ = ["GeneralizedRCNN", "ProposalNetwork","VideoRCNN"]
 
@@ -78,10 +78,13 @@ class VideoRCNN(nn.Module):
                 The :class:`Instances` object has the following keys:
                     "pred_boxes", "pred_classes", "scores", "pred_masks", "pred_keypoints"
         """
+        #print('setting roi_heads is video to ',self.is_video)
+        self.roi_heads.is_video = self.is_video
         if not self.training:
             return self.inference(batched_inputs, detected_instances)
        
         #print([f['file_name'] for f in batched_inputs])
+        
         images = self.preprocess_image(batched_inputs)
         if "instances" in batched_inputs[0]:
             gt_instances = [x["instances"].to(self.device) for x in batched_inputs]
@@ -112,7 +115,32 @@ class VideoRCNN(nn.Module):
             proposal_losses = {}
             
             
-       
+        img_index = 0
+        mod_labels = []
+        
+        
+        #for img in batched_inputs:
+            #print(img)
+            
+            #img_cv = img['image'].to('cpu').numpy().transpose(1,2,0)
+            #print(img['file_name'])
+            #print(labels_total[img_index])
+            #indices = [labels_total[img_index].index(x) for x in pairs_used if x in labels_total[img_index]]
+            #print(indices)
+            #print(gt_instances[img_index].gt_boxes)
+            #for index in indices:
+            
+            
+                #gt_instances[img_index].gt_boxes[index].to('cpu').scale(1.0733,1.08)
+                #box = gt_instances[img_index].gt_boxes[index].to('cpu').tensor.numpy()[0]
+                #print(box)
+                #cv2.rectangle(img_cv, (int(box[0]), int(box[1])), (int(box[2]),int(box[3])),(255,0,0), 3)
+                #cv2.putText(img_cv,'object_id:%s'%(str(labels_total[img_index][index])), (int(box[0]), int(box[1])),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+              
+              
+              
+            #cv2.imwrite('img_%s.jpg'%str(img_index),img_cv)
+            #img_index+=1
         _, detector_losses = self.roi_heads(images, features, proposals, gt_instances,labels = labels_total,classes = classes_total,pairs_used = pairs_used)
 
         losses = {}
@@ -217,13 +245,7 @@ class VideoRCNN(nn.Module):
         Returns:
             same as in :meth:`forward`.
         """
-        #if(self.reid_network==None and self.use_reid == True):
-            
-            #self.reid_network = LightWeight()
-            #self.reid_network.load_state_dict(torch.load('/home/issa_mouawad/tracking_wo_bnw/output/tracktor/KITTI/test/LightWeight_iter_686.pth',
-                                     #map_location=lambda storage, loc: storage))
-            #self.reid_network.eval()
-            #self.reid_network.cuda()
+        
         frame_gray = cv2.imread(self.photo_name, cv2.COLOR_BGR2GRAY)
         frame = cv2.imread(self.photo_name)
         prev_gray=None
@@ -295,9 +317,13 @@ class VideoRCNN(nn.Module):
         else:
             #detected_instances = [x.to(self.device) for x in detected_instances]
             embeds = self.roi_heads.forward_with_given_boxes(features, detected_instances)
-            return embeds
+            detected_instances = detected_instances.to('cpu')
+            self.tracker.track(detected_instances,embeds, self.photo_name,prev_gray,frame)
+            b = self.tracker.get_display_tracks()
+           
+            return b
             #results = self.roi_heads.forward_with_given_boxes(features, [detected_instances])
-       
+           
         if do_postprocess:
             processed_results = []
             for results_per_image, input_per_image, image_size in zip(
@@ -390,6 +416,7 @@ class GeneralizedRCNN(nn.Module):
                 The :class:`Instances` object has the following keys:
                     "pred_boxes", "pred_classes", "scores", "pred_masks", "pred_keypoints"
         """
+        self.roi_heads.is_video = self.is_video
         if not self.training:
             return self.inference(batched_inputs)
 
@@ -535,7 +562,7 @@ class GeneralizedRCNN(nn.Module):
                 assert "proposals" in batched_inputs[0]
                 proposals = [x["proposals"].to(self.device) for x in batched_inputs]
 
-            results, descs = self.roi_heads(images, features, sel_props, None)
+            results, descs,descs2 = self.roi_heads(images, features, sel_props, None)
         else:
             detected_instances = [x.to(self.device) for x in detected_instances]
             results = self.roi_heads.forward_with_given_boxes(features, detected_instances)
