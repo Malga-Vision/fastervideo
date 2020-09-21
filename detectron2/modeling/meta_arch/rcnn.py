@@ -40,6 +40,9 @@ class VideoRCNN(nn.Module):
         self.roi_heads = build_roi_heads(cfg, self.backbone.output_shape())
         
         self.proposals_used = []
+        
+        self.track_times = []
+        self.track_count = []
         self.top_five_logits = []
         assert len(cfg.MODEL.PIXEL_MEAN) == len(cfg.MODEL.PIXEL_STD)
         num_channels = len(cfg.MODEL.PIXEL_MEAN)
@@ -52,10 +55,7 @@ class VideoRCNN(nn.Module):
         self.prev_grey = None
         self.frame = None
         self.cur_grey = None
-        self.reid_network = None
-        self.det_times = []
-        self.track_times = []
-        self.track_count = []
+        
         
         
     def forward(self, batched_inputs, detected_instances=None):
@@ -122,35 +122,14 @@ class VideoRCNN(nn.Module):
         mod_labels = []
         
         
-        #for img in batched_inputs:
-            #print(img)
-            
-            #img_cv = img['image'].to('cpu').numpy().transpose(1,2,0)
-            #print(img['file_name'])
-            #print(labels_total[img_index])
-            #indices = [labels_total[img_index].index(x) for x in pairs_used if x in labels_total[img_index]]
-            #print(indices)
-            #print(gt_instances[img_index].gt_boxes)
-            #for index in indices:
-            
-            
-                #gt_instances[img_index].gt_boxes[index].to('cpu').scale(1.0733,1.08)
-                #box = gt_instances[img_index].gt_boxes[index].to('cpu').tensor.numpy()[0]
-                #print(box)
-                #cv2.rectangle(img_cv, (int(box[0]), int(box[1])), (int(box[2]),int(box[3])),(255,0,0), 3)
-                #cv2.putText(img_cv,'object_id:%s'%(str(labels_total[img_index][index])), (int(box[0]), int(box[1])),cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-              
-              
-              
-            #cv2.imwrite('img_%s.jpg'%str(img_index),img_cv)
-            #img_index+=1
+      
         _, detector_losses = self.roi_heads(images, features, proposals, gt_instances,labels = labels_total,classes = classes_total,pairs_used = pairs_used)
 
         losses = {}
         losses.update(detector_losses)
         losses.update(proposal_losses)
         return losses
-    
+   
 
     
     def inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
@@ -171,16 +150,22 @@ class VideoRCNN(nn.Module):
             same as in :meth:`forward`.
         """
         
-        frame_gray = cv2.imread(self.photo_name, cv2.COLOR_BGR2GRAY)
-        frame = cv2.imread(self.photo_name)
+        frame_gray = None#cv2.imread(self.photo_name, cv2.COLOR_BGR2GRAY)
+        frame = None
+        #frame = cv2.imread(self.photo_name)
         prev_gray=None
         if(self.prev_path!=0):
-            prev_gray = cv2.imread(self.prev_path,cv2.COLOR_BGR2GRAY)
+            prev_gray = None#cv2.imread(self.prev_path,cv2.COLOR_BGR2GRAY)
         assert not self.training
+        init_track = time.time()
+        if(self.tracking_proposals==True):
+            adds = self.tracker.get_predicted_tracks(frame_gray,prev_gray,0,0)
+            track_boxes =  np.array([t[1:5] for t in adds])
+        track_time = (time.time() - init_track)
+            
         start = time.time()
         images = self.preprocess_image(batched_inputs)
         
-
         #print(self.backbone.size_divisibility)
         features = self.backbone(images.tensor)
         
@@ -193,21 +178,23 @@ class VideoRCNN(nn.Module):
                 #if(len(self.tracker.tracks)==0):
                     
                 if(self.tracking_proposals==False):
-                    
+                   
                     props = pprops[:self.props_limit]
+                    self.proposals_used.append(self.props_limit)
                     
                 else:
-                    
                     
                     thresh = pprops[:self.props_limit]
                     dets = []
                     i=0
-                    adds = self.tracker.get_predicted_tracks(frame_gray,prev_gray,0,0)
+                    
+                    
+                    
                     self.proposals_used.append(len(adds)+self.props_limit)
                     props_boxes = thresh.proposal_boxes.tensor
                     prop_scores = thresh.objectness_logits
     
-                    track_boxes =  np.array([t[1:5] for t in adds])
+                    
                     #track_boxes = np.array([[1,2,3,4],[5,6,7,8]])
     
                     merged_boxes = torch.cat((thresh.proposal_boxes.tensor,torch.from_numpy(track_boxes).float().to('cuda')))
@@ -246,14 +233,23 @@ class VideoRCNN(nn.Module):
                 r = r.to('cpu')
                 torch.cuda.synchronize()
                 end = time.time()
-                self.det_times.append(end-start)
+                
+                per_instance = None
                 if(self.use_reid==True):
+                    per_instance = embeds.to('cpu')
                     
-                    self.tracker.track(r,embeds, self.photo_name,prev_gray,frame)
-                else:
-                    self.tracker.track(r,descs, self.photo_name,prev_gray,frame)
+                    
+                elif(self.tracker.use_appearance==True and self.tracker.hog==False):
+                    per_instance = descs.to('cpu')
+                    
+                self.det_times.append(end-start)
+                start_track = time.time()
+                self.tracker.track(r,per_instance, self.photo_name,prev_gray,frame)
                 b = self.tracker.get_display_tracks()
+                track_time += time.time()-start_track
+                self.track_times.append(track_time)
                 self.total_times.append(time.time()-start)
+                self.track_count.append(len(self.tracker.tracks))
                 return b
                 
             processed_results = []
@@ -357,85 +353,7 @@ class GeneralizedRCNN(nn.Module):
         losses.update(detector_losses)
         losses.update(proposal_losses)
         return losses
-    def center (self,box):
-        return (box[0] + ((box[2]-box[0])/2), box[1] + ((box[3]-box[1])/2))
-    def aspect_ratio(self,box):
-        return (box[2]-box[0])/(box[3]-box[1])
-    def norm_center(self,box,size):
-        c = self.center(box)
-        return (c[0]/size[1],c[1]/size[0])
-    def norm_center_norm_aspect(self,box,size,norm_factor):
-        c = self.center(box)
-        return (c[0]/size[1],c[1]/size[0],self.aspect_ratio(box)/norm_factor)
-    def norm_center_aspect(self,box,size):
-        c = self.center(box)
-        return (c[0]/size[1],c[1]/size[0],self.aspect_ratio(box))
-    def norm_bbox(self,box,size):
-        return (box[0]/size[1],box[2]/size[1],box[1]/size[0],box[3]/size[0])
-    def cluster(self,boxes,size):
-        clusters = []
-        centers = []
-        ars = []
-        if(self.cluster_rep =='n_c_n_a'):
-            for b in boxes:
-                box = b.cpu().numpy()
-                ars.append(self.aspect_ratio(box))
-        norm_factor = np.linalg.norm(ars)
-        
-        for b in boxes:
-            box = b.cpu().numpy()
-            if(self.cluster_rep=='n_c'):
-                c = self.norm_center(box,size)
-            elif(self.cluster_rep=='n_c_a'):
-                c = self.norm_center_aspect(box,size)
-            elif(self.cluster_rep=='n_c_n_a'):
-                c= self.norm_center_norm_aspect(box,size,norm_factor)
-            elif(self.cluster_rep=='n_b'):
-                c = self.norm_bbox(box,size)
-            centers.append(c)
-            
-        Z= linkage(centers, 'ward')
-        centers = np.array(centers)
-                
-        clusters = fcluster(Z, self.max_distance,  criterion='distance')
-        
-        return clusters
-    def get_proposals_by_cluster(self,proposalss):
-        clusters =  self.cluster(proposalss.proposal_boxes,proposalss._image_size)
-                    
-        
-        result_dim = 0
-        for c in list(set(clusters)):
-            cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
-            #if(len(cluster_based)>1):
-                #result_dim+=2
-            #else:
-            result_dim+=1
-        merged = torch.Tensor(result_dim,4)
-        i=0
-        conf_list = []
-        self.proposals_used.append(len(list(set(clusters))))
-        for c in list(set(clusters)):
-            cluster_based = list((proposalss.proposal_boxes[np.where(clusters==c)]))
-            top = cluster_based[0]
-            merged[i,:] = top.to('cuda')
-            conf_temp = proposalss.objectness_logits[np.where(clusters==c)][0]
-            conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
-            #if(len(cluster_based)>1):
-                #second_top= cluster_based[1]
-                #i+=1
-                #merged[i,:] = second_top.to('cuda')
-                #conf_temp = proposalss.objectness_logits[np.where(clusters==c)][1]
-                #conf_list.append(np.array(conf_temp.cpu(),ndmin=1)[0])
-           
-            i+=1
-        
-        conf_cuda = torch.from_numpy(np.array(conf_list)).float().to('cuda')
-        
-        new_proposals = Instances(proposalss._image_size,
-        proposal_boxes = Boxes(merged.to('cuda')),
-        objectness_logits = conf_cuda)
-        return new_proposals
+    
     def inference(self, batched_inputs, detected_instances=None, do_postprocess=True):
         """
         Run inference on the given inputs.
@@ -464,10 +382,8 @@ class GeneralizedRCNN(nn.Module):
                 proposalss = props[:self.props_limit]
                 #self.test_props.append(detector_postprocess(proposalss,batched_inputs[0]['height'],batched_inputs[0]['width']))
                 sel_props = []
-                if(self.enable_clustering==True):
-                    sel_props = [self.get_proposals_by_cluster(proposalss)]
-                else:
-                    sel_props = [proposalss]
+                
+                sel_props = [proposalss]
                 
             else:
                 assert "proposals" in batched_inputs[0]

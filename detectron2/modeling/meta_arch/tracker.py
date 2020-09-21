@@ -28,9 +28,7 @@ class Tracker(object):
         self.detect_interval=3
         self.track_len = 10
         self.distances = []
-        self.feature_params=dict(maxCorners=200,qualityLevel=0.3,minDistance=7,blockSize=7)
-        self.lk_params=dict(winSize=(15,15),maxLevel=2,criteria=(cv.TERM_CRITERIA_EPS|cv.TERM_CRITERIA_COUNT,10,0.03))
-        self.flow_time=0
+        
     
     def get_distance_matrix(self,dets,tracks,frame):
         
@@ -43,7 +41,7 @@ class Tracker(object):
                     if(self.embed==True or self.reid==True):
                         if(self.dist=='cosine'):
                             desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
-                            (tracks[itrack].descriptor.shape)
+                            
                         
                         else:
                             desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
@@ -82,9 +80,10 @@ class Tracker(object):
         return [],[]
 
     def track(self,dets_org,descs_tensor ,frame,prev_gray,cur):
-        frame_gray = cv.imread(frame, cv.COLOR_BGR2GRAY)
+        frame_gray =None# cv.imread(frame, cv.COLOR_BGR2GRAY)
+        
         dets_tensor = dets_org
-        descs_tensor = descs_tensor.to('cpu')
+        
         self.image_size = dets_tensor._image_size
         dets = []
         missed_tracks = 0
@@ -96,9 +95,10 @@ class Tracker(object):
             ymin = dets_tensor.pred_boxes[int(i)].tensor[0,1].numpy()
             xmax = dets_tensor.pred_boxes[int(i)].tensor[0,2].numpy()
             ymax = dets_tensor.pred_boxes[int(i)].tensor[0,3].numpy()
-            
-            dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i].numpy().ravel()))
-                
+            if(self.use_appearance==True and  self.hog ==False):
+                dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i].numpy().ravel()))
+            else:
+                dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),np.array([])))
             
                 
             if(self.use_appearance==True and self.hog==True):
@@ -113,16 +113,18 @@ class Tracker(object):
         
         for trk in self.tracks:
             trk.occluded  = False
-        for trk in self.tracks:
-            for others in self.tracks:
-                if(trk.track_id==others.track_id or not (trk.pred_class == others.pred_class)):
-                    continue
-                if(ios(trk.corners(),others.corners())>=1):
-                    if(others.ymax>= trk.ymax):
+        detect_occ = False
+        if(detect_occ):
+            for trk in self.tracks:
+                for others in self.tracks:
+                    if(trk.track_id==others.track_id or not (trk.pred_class == others.pred_class)):
+                        continue
+                    if(ios(trk.corners(),others.corners())>=1):
+                        if(others.ymax>= trk.ymax):
                         
-                        trk.occluded = True
+                            trk.occluded = True
                     
-                    break
+                        break
      
 
         for pred_class in list_classes:

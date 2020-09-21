@@ -32,9 +32,7 @@ class Track(Detection):
         self.descriptor[:] = det.descriptor[:]
         self.track_id = _id
         self.method = method
-        self.feature_params=dict(maxCorners=30,qualityLevel=0.3,minDistance=7,blockSize=7)
-        self.lk_params=dict(winSize=(15,15),maxLevel=2,criteria=(cv.TERM_CRITERIA_EPS|cv.TERM_CRITERIA_COUNT,10,0.03))
-        self.method = method
+       
         if(method=='kalman_vel'):
             self.init_kalman_tracker_vel(measurement_noise,process_noise)
         elif(method=='kalman_acc'):
@@ -200,10 +198,7 @@ class Track(Detection):
             self.pred_xmax = pred[2][0]
             self.pred_ymax = pred[3][0]
             
-        elif(self.method =='keypoint_flow'):
-            self.shiftKeyPointsFlow(frame_gray,prev_frame_gray)
-        elif(self.method =='dense_flow'):
-            self.shiftFBFlow()
+        
     def __repr__(self):
         return "id:%d, xmin: %f, ymin:%f, xmax:%f, ymax:%f, conf:%f, class:%d"%(self.track_id, self.xmin,self.ymin,self.xmax,self.ymax,self.conf,self.pred_class)
         

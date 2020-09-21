@@ -106,9 +106,9 @@ class SoftTracker(object):
         return [],[]
 
     def track(self,dets_org,descs_tensor ,frame,prev_gray,cur):
-        frame_gray = cv.imread(frame, cv.COLOR_BGR2GRAY)
+        frame_gray = None#cv.imread(frame, cv.COLOR_BGR2GRAY)
         dets_tensor = dets_org
-        descs_tensor = descs_tensor.to('cpu')
+        #descs_tensor = descs_tensor.to('cpu')
         self.image_size = dets_tensor._image_size
         dets = []
         missed_tracks = 0
@@ -120,8 +120,11 @@ class SoftTracker(object):
             ymin = dets_tensor.pred_boxes[int(i)].tensor[0,1].numpy()
             xmax = dets_tensor.pred_boxes[int(i)].tensor[0,2].numpy()
             ymax = dets_tensor.pred_boxes[int(i)].tensor[0,3].numpy()
+            if(self.use_appearance==True and  self.hog ==False):
+                dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i].numpy().ravel()))
+            else:
+                dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),np.array([])))
             
-            dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i].numpy().ravel()))
                 
             
                 
