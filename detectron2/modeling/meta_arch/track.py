@@ -22,8 +22,6 @@ class Track(Detection):
         self.old_center = []
         self.old_slope = 0
         self.major_color=major_color
-        
-        
         self.embed_alpha = embed_alpha
         self.occluded = False
         self.missed_count=0
@@ -159,15 +157,15 @@ class Track(Detection):
                 self.ymin = det.ymin
                 self.xmax=det.xmax
                 self.ymax = det.ymax
-            
-                
+              
     
     def apply_prediction(self,frame_gray,prev_frame_gray):
         
         self.predict(prev_frame_gray,frame_gray)
         
         
-        self.old_center = self.center()
+        
+        
         
         if(self.tracked_count>5):
             self.xmin = self.pred_xmin
@@ -179,11 +177,10 @@ class Track(Detection):
             self.ymin = self.pred_ymin
             self.xmax = self.pred_xmax
             self.ymax = self.pred_ymax
-        vec = self.center() - self.old_center
-        if(vec[0]==0):
-            self.old_slope = 999
-        else:
-            self.old_slope = vec[1]/vec[0]
+        
+        
+            
+        
         
 
     def draw_own_mask(self,mask):

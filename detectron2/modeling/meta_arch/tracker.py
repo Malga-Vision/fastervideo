@@ -190,7 +190,6 @@ class Tracker(object):
     
     def get_display_tracks(self):
         
-       
     
         
         self.tracks = [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_life]
