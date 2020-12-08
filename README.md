@@ -1,4 +1,4 @@
-# FasterVideo for efficient joint detection and tracking
+# FasterVideo: efficient joint detection and tracking
 This repository is based on Detectron2 from FAIR 
 https://github.com/facebookresearch/detectron2
 
