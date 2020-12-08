@@ -20,6 +20,15 @@ Using Faster R-CNN and an additional Embeddings head (trained using triplet loss
 
 ### Installation
 Running the following command `python -m pip install -e fastervideo`
+### Usage:
+See the notebooks for details
+### Data
+You need to download the datasets and store them in the datasets folder under the correct subfolder maintaining the default hierarchy.
+#### KITTI: http://www.cvlibs.net/download.php?file=data_object_image_2.zip
+#### MOT17: https://motchallenge.net/data/MOT17.zip
+#### MOT20: https://motchallenge.net/data/MOT20.zip
+### Trained Model Weights
+weights of trained models can be found on this [link](https://unigeit-my.sharepoint.com/:u:/g/personal/s4554705_studenti_unige_it/EQBXBXsLrINHljE7W1oipLwBZPPFaB7J5RSPjjYusuKYUA?e=8ZWi1n)
 ## Results:
 
 ### KITTI
@@ -45,11 +54,3 @@ Running the following command `python -m pip install -e fastervideo`
 |FasterVideo|44.7|39.1|76.2|92.5|49.5|4171|0.8|
 |Tracktor++|50.8|52.1|76.8|84.7|62.7|2751|0.2*|
 |SORT|42.7|45.1|78.5|90.2|48.8|4470|57.3*|
-
-## Usage:
-Create your python environment, requirements are usual packages, make sure to include pytorch and torchvision
-Take a look at the notebooks available in the folder notebooks, which will guide through training and evaluation of the  method
-### Data
-You need to download the datasets and store them in the datasets folder under the correct subfolder maintaining the default hierarchy.
-### Model Weights
-weights of trained models can be found on this [link](https://unigeit-my.sharepoint.com/:u:/g/personal/s4554705_studenti_unige_it/EQBXBXsLrINHljE7W1oipLwBZPPFaB7J5RSPjjYusuKYUA?e=8ZWi1n)
