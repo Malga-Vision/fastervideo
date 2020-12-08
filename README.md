@@ -5,6 +5,21 @@ https://github.com/facebookresearch/detectron2
 This code performs joint detection and tracking for object tracking tasks.
 Using Faster R-CNN and an additional Embeddings head (trained using triplet loss) the method is trained and tested on several datasets and benchmarks (KITTI, MOT17, MOT20)
 
+### Requirements
+- Linux or macOS
+- Python >= 3.6 [preferably a conda environment]
+- PyTorch 1.7
+- [torchvision](https://github.com/pytorch/vision/) that matches the PyTorch installation.
+	You can install them together at [pytorch.org](https://pytorch.org) to make sure of this.
+- OpenCV
+- [fvcore](https://github.com/facebookresearch/fvcore/): `pip install 'git+https://github.com/facebookresearch/fvcore'`
+- pycocotools: `pip install cython; pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'`
+- GCC >= 4.9
+- Motmetrics: `pip install motmetrics`
+- Jupyter notebook to run the notebooks
+
+### Installation
+Running the following command `python -m pip install -e fastervideo`
 ## Results:
 
 ### KITTI
