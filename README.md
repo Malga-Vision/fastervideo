@@ -36,3 +36,5 @@ Create your python environment, requirements are usual packages, make sure to in
 Take a look at the notebooks available in the folder notebooks, which will guide through training and evaluation of the  method
 ### Data
 You need to download the datasets and store them in the datasets folder under the correct subfolder maintaining the default hierarchy.
+### Model Weights
+weights of trained models can be found on this [link](https://unigeit-my.sharepoint.com/:u:/g/personal/s4554705_studenti_unige_it/EQBXBXsLrINHljE7W1oipLwBZPPFaB7J5RSPjjYusuKYUA?e=8ZWi1n)
