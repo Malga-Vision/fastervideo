@@ -36,15 +36,19 @@ class Tracker(object):
         for itrack in range(len(tracks)):
             for ipred in range(len(dets)):
                 desc_dist=0
+                iou_overlap = g_iou(dets[ipred].corners(),tracks[itrack].corners())
                 if(self.use_appearance==True):
                     
                     if(self.embed==True or self.reid==True):
-                        if(self.dist=='cosine'):
-                            desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
+                    	if(iou_overlap < -0.25):
+                    	     desc_dist = 999
+                    	else:
+                            if(self.dist=='cosine'):
+                                desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
                             
                         
-                        else:
-                            desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
+                            else:
+                                desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
                         
                     else:
                         
@@ -53,7 +57,7 @@ class Tracker(object):
                         
                 
                 
-                iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
+                
                 iou_dist = 1-iou_overlap
                 
                 self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
