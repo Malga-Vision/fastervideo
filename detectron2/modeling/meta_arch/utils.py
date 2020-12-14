@@ -133,6 +133,7 @@ def g_iou(b_p,b_g):
 	
 	I = (x2_i - x1_i)* ( y2_i - y1_i)
 	
+	
 	x1_c = min(b_p[0],b_g[0])
 	y1_c = min(b_p[1],b_g[1])
 	x2_c = max(b_p[2],b_g[2])
