@@ -121,6 +121,33 @@ def iou(a, b):
 	# RATIO OF AREA OF OVERLAP OVER COMBINED AREA
 	iou = area_overlap / (area_combined+epsilon)
 	return iou   
+def g_iou(b_p,b_g):
+	epsilon = 1e-5
+	A_g = (b_g[2]-b_g[0])*(b_g[3]-b_g[1])
+	A_p = (b_p[2]-b_p[0])*(b_p[3]-b_p[1])
+	
+	x1_i = max(b_p[0],b_g[0])
+	y1_i = max(b_p[1],b_g[1])
+	x2_i = min(b_p[2],b_g[2])
+	y2_i = min(b_p[2],b_g[2])
+	
+	I = (x2_i - x1_i)* ( y2_i - y1_i)
+	
+	x1_c = min(b_p[0],b_g[0])
+	y1_c = min(b_p[1],b_g[1])
+	x2_c = max(b_p[2],b_g[2])
+	y2_c = max(b_p[2],b_g[2])
+	
+	A_c = (x2_c - x1_c) * ( y2_c - y1_c)
+	
+	U = A_p + A_g - I
+	
+	IoU = I/U
+	
+	GIoU = IoU - ((A_c - U)/A_c)
+	
+	return GIoU
+	
 def ios(a,b):
 	epsilon=1e-5
 
@@ -144,7 +171,8 @@ def ios(a,b):
 
 	# RATIO OF AREA OF OVERLAP OVER COMBINED AREA
 	iou = area_overlap / (area_combined+epsilon)
-	return iou   
+	return iou
+
 def get_hog_descriptor(frame,xmin,ymin,xmax,ymax,num_cells=1):
     
     if(xmin<0):
