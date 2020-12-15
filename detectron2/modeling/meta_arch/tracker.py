@@ -31,7 +31,7 @@ class Tracker(object):
         
     
     def get_distance_matrix(self,dets,tracks,frame):
-        
+        sup_count = 0
         dists = np.zeros((len(dets),len(tracks)),np.float32)
         for itrack in range(len(tracks)):
             for ipred in range(len(dets)):
@@ -41,6 +41,7 @@ class Tracker(object):
                     
                     if(self.embed==True or self.reid==True):
                     	if(iou_overlap < -0.25):
+                    	     sup_count =+1
                     	     desc_dist = 999
                     	else:
                             if(self.dist=='cosine'):
@@ -66,7 +67,8 @@ class Tracker(object):
                 total_dist = iou_dist +desc_dist 
             
                 dists[ipred,itrack] = total_dist
-                
+               
+        print('suppresed are',sup_count)
         return dists
     def get_predicted_tracks(self,frame_gray,prev_gray,scale_x,scale_y):
         adds = []
