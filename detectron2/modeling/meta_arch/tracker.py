@@ -41,8 +41,8 @@ class Tracker(object):
                     
                     if(self.embed==True or self.reid==True):
                     	if(iou_overlap < -0.25):
-                    	     sup_count =+1
-                    	     desc_dist = 999
+                    	    sup_count =+1
+                    	    desc_dist = 999
                     	else:
                             if(self.dist=='cosine'):
                                 desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
