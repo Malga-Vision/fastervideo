@@ -161,6 +161,8 @@ class VideoRCNN(nn.Module):
         if(self.tracking_proposals==True):
             adds = self.tracker.get_predicted_tracks(frame_gray,prev_gray,0,0)
             track_boxes =  np.array([t[1:5] for t in adds])
+            
+                
         track_time = (time.time() - init_track)
             
         start = time.time()
@@ -214,9 +216,18 @@ class VideoRCNN(nn.Module):
             #print(len(descs_pooled))
         else:
             #detected_instances = [x.to(self.device) for x in detected_instances]
-            embeds = self.roi_heads.forward_with_given_boxes(features, detected_instances)
+            features,embeds = self.roi_heads.forward_with_given_boxes(features, detected_instances)
+            per_instance = None
+            if(self.use_reid==True):
+                per_instance = embeds.to('cpu')
+                    
+                    
+            elif(self.tracker.use_appearance==True and self.tracker.hog==False):
+                per_instance = features.to('cpu')
             detected_instances = detected_instances.to('cpu')
-            self.tracker.track(detected_instances,embeds, self.photo_name,prev_gray,frame)
+            
+            #return embeds
+            self.tracker.track(detected_instances,per_instance, self.photo_name,prev_gray,frame)
             b = self.tracker.get_display_tracks()
            
             return b

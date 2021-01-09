@@ -123,32 +123,56 @@ def iou(a, b):
 	return iou   
 def g_iou(b_p,b_g):
 	epsilon = 1e-5
+
 	A_g = (b_g[2]-b_g[0])*(b_g[3]-b_g[1])
 	A_p = (b_p[2]-b_p[0])*(b_p[3]-b_p[1])
-	
+	if(A_g<0):
+		#print("A_g = 0",b_g)
+		A_g=0
+	if(A_p<0):
+		print("A_p = 0")
+		A_p = 0
 	x1_i = max(b_p[0],b_g[0])
 	y1_i = max(b_p[1],b_g[1])
 	x2_i = min(b_p[2],b_g[2])
-	y2_i = min(b_p[2],b_g[2])
-	
-	I = (x2_i - x1_i)* ( y2_i - y1_i)
-	
-	
+	y2_i = min(b_p[3],b_g[3])
+	width_i = x2_i - x1_i
+	height_i = y2_i-y1_i
+	if(width_i<0 or height_i<0):
+		I=0
+		#print("I=0")
+	else:
+        
+		I = (x2_i - x1_i)* ( y2_i - y1_i)
+
+   
+
 	x1_c = min(b_p[0],b_g[0])
 	y1_c = min(b_p[1],b_g[1])
 	x2_c = max(b_p[2],b_g[2])
-	y2_c = max(b_p[2],b_g[2])
-	
-	A_c = (x2_c - x1_c) * ( y2_c - y1_c)
-	
+	y2_c = max(b_p[3],b_g[3])
+	width_c = x2_c-x1_c    
+	height_c = y2_c - y1_c
+        
+	if(width_c <0 or height_c<0):  
+		A_c=0
+		print("AC = 0")
+	else:
+		A_c = (x2_c - x1_c) * ( y2_c - y1_c)
+
 	U = A_p + A_g - I
-	
+	#print(A_c,x1_c,x2_c,y1_c,y2_c)
+	#print(U,A_p,A_g,I)
 	IoU = I/U
 	
 	GIoU = IoU - ((A_c - U)/A_c)
+	if(A_g<200):
+		GIoU=0
+	if(GIoU<-1):
+		print("GIOU<0!!!!")
+	return GIoU,IoU
 	
-	return GIoU
-	
+
 def ios(a,b):
 	epsilon=1e-5
 
@@ -226,6 +250,62 @@ def calc_major_color(frame,xmin,ymin,xmax,ymax):
     lab = cv2.cvtColor(frame[int(ymin):int(ymax),int(xmin):int(xmax),:], cv2.COLOR_BGR2Lab)
     return [np.median(lab)]
 
+
+def convert_bbox_to_z(bbox):
+  """
+  Takes a bounding box in the form [x1,y1,x2,y2] and returns z in the form
+    [x,y,s,r] where x,y is the centre of the box and s is the scale/area and r is
+    the aspect ratio
+  """
+  w = bbox[2] - bbox[0]
+  h = bbox[3] - bbox[1]
+  x = bbox[0] + w/2.
+  y = bbox[1] + h/2.
+  s = w * h    #scale is just area
+  
+  r = w / float(h)
+  return np.array([x, y, s, r],np.float32)
+
+
+
+def convert_x_to_bbox(x,score=None):
+  """
+  Takes a bounding box in the centre form [x,y,s,r] and returns it in the form
+    [x1,y1,x2,y2] where x1,y1 is the top left and x2,y2 is the bottom right
+  """
+
+  w = np.sqrt(np.abs(x[2] * x[3]))
+  
+  if(w<=0):
+      w=1
+  h = x[2] / w
+  if(score==None):
+    return np.array([x[0]-w/2.,x[1]-h/2.,x[0]+w/2.,x[1]+h/2.],np.float32)
+  else:
+    return np.array([x[0]-w/2.,x[1]-h/2.,x[0]+w/2.,x[1]+h/2.,score]).reshape((1,5))
+def translate(box,another_center):
     
+    cur_center = center(box)
+    vec_x = another_center[0] - cur_center[0]
+    vec_y = another_center[1] - cur_center[1]
+    xmin = box[0] + vec_x
+    xmax = box[2] + vec_x
+    ymin = box[1] +vec_y
+    ymax = box[3] + vec_y
+    return [xmin,ymin,xmax,ymax]
+def center(box):
+	return [(box[2]+box[0])/2,(box[3]+box[1])/2]
+def mod_iou(a,b):
+	iou_org = iou(a,b)
+	if(iou_org==0):
+		#print(a)
+		#print(b)
+		
 
-
+		a_center = center(a)
+		#print(a_center)
+		b_copy = translate(b,a_center)
+		#print(b_copy)
+		#print(1-iou(a,b_copy))
+		return -(1- iou(a,b_copy))
+	return iou_org

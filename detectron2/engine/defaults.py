@@ -200,11 +200,11 @@ class DefaultPredictor:
         if(not (detections is None)):
             boxes = np.array([v[0:4] for v in detections])
             merged_boxes = torch.from_numpy(boxes).float().to('cuda')
-            scores = np.array([v[4] for v in detections])
+            scores = np.array([v[5] for v in detections])
             scores = torch.from_numpy(scores).float().to('cpu')
                     
             pred_classes = np.zeros(scores.shape[0])
-            
+            pred_classes = np.array([v[4] for v in detections])
             
             pred_classes = torch.from_numpy(pred_classes).float().to('cpu')
             props = Instances(original_image.shape[:2],proposal_boxes = Boxes(merged_boxes),pred_boxes = Boxes(merged_boxes),scores = scores,pred_classes = pred_classes)

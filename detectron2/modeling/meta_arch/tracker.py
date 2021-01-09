@@ -18,38 +18,37 @@ import torch
 
 
 class Tracker(object):
-    def __init__(self,method='kalman_acc'):
+    def __init__(self,method='kalman_vel'):
         self.tracking_method = method
         
         self.tracks = []
         self.cur_id=1
-        self.frameCount =1
+        self.frameCount =0
         self.history_window = 3
         self.detect_interval=3
         self.track_len = 10
         self.distances = []
-        
-    
+        self.sups = []
+        self.tots = []
     def get_distance_matrix(self,dets,tracks,frame):
-        
+        sup_count=0
         dists = np.zeros((len(dets),len(tracks)),np.float32)
         for itrack in range(len(tracks)):
             for ipred in range(len(dets)):
                 desc_dist=0
-                iou_overlap = g_iou(dets[ipred].corners(),tracks[itrack].corners())
+                
+                iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
+                
                 if(self.use_appearance==True):
                     
                     if(self.embed==True or self.reid==True):
-                    	if(iou_overlap < -0.25):
-                    	     desc_dist = 999
-                    	else:
-                            if(self.dist=='cosine'):
-                                desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
+                        
+                        if(self.dist=='cosine'):
+                            desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)
                             
-                        
-                            else:
-                                desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
-                        
+                        else:
+                            desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
+
                     else:
                         
                         desc_dist = np.linalg.norm(dets[ipred].hog-tracks[itrack].hog, ord=1)/self.dist_thresh
@@ -58,23 +57,21 @@ class Tracker(object):
                 
                 
                 
+                
                 iou_dist = 1-iou_overlap
                 
-                self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
-               
-                
-                total_dist = iou_dist +desc_dist 
+                total_dist =  desc_dist + iou_dist
             
                 dists[ipred,itrack] = total_dist
-                
+      
         return dists
     def get_predicted_tracks(self,frame_gray,prev_gray,scale_x,scale_y):
         adds = []
         for t,trk in enumerate(self.tracks):
             if(self.use_kalman==True):
-                if(trk.tracked_count>5):
+                #if(trk.tracked_count>5):
 
-                    trk.apply_prediction(None,None)
+                trk.apply_prediction(None,None)
                 
             
             adds.append([trk.conf,trk.xmin,trk.ymin,trk.xmax,trk.ymax])
@@ -84,7 +81,7 @@ class Tracker(object):
         return [],[]
 
     def track(self,dets_org,descs_tensor ,frame,prev_gray,cur):
-        frame_gray =None# cv.imread(frame, cv.COLOR_BGR2GRAY)
+        frame_gray = frame
         
         dets_tensor = dets_org
         
@@ -140,15 +137,16 @@ class Tracker(object):
             r,c = linear_sum_assignment(dists)
             
             for ri,rval in enumerate(r):
-                limit = 0.75
+                limit = self.dist_thresh
                 if(self.use_appearance==True):
-                    limit  =1.2
-                if(dists[r[ri],c[ri]]>limit):
+                    limit  =self.dist_thresh
+                
+                if(dists[rval,c[ri]]>limit):
                  
-                      
+                 
                   r[ri] = -1
                   c[ri] = -1
-             
+            
             for t,trk in enumerate(track_class):
                 
                 if(t not in c ):
@@ -157,21 +155,23 @@ class Tracker(object):
                     trk.missed_count+=1
                     trk.tracked_count=0 
                     
-                    trk.apply_prediction(frame_gray,prev_gray)
+                    #trk.apply_prediction(frame_gray,prev_gray)
                     missed_tracks+=1
                     
                 else:
                     
                     
                     trk.is_overlap = False
-                    if(self.use_overlap):
-                        for others in self.tracks:
-                            if(trk.track_id==others.track_id):
-                                continue
-                            if(ios(trk.corners(),others.corners())>=self.overlap_threshold):
-                                trk.is_overlap = True
-                                break
-                    trk.update(dets_class[np.where(c==t)[0][0]],frame_gray,prev_gray)
+                    #if(self.use_overlap):
+                        #for others in self.tracks:
+                            #if(trk.track_id==others.track_id):
+                                #continue
+                            #if(ios(trk.corners(),others.corners())>=self.overlap_threshold):
+                                #trk.is_overlap = True
+                                #break
+                    
+                    
+                    trk.update(dets_class[r[np.where(c==t)[0][0]]],frame_gray,prev_gray)
                     matched +=1
             for d,det in enumerate(dets_class):
                 if(d not in r and det.conf>0.6):
@@ -186,7 +186,7 @@ class Tracker(object):
                             continue
                     missed_dets+=1
                     
-                    self.tracks.append(Track(self.tracking_method,self.cur_id,det,frame_gray,measurement_noise = self.measurement_noise,process_noise = self.process_noise, embed_alpha = self.embed_alpha))
+                    self.tracks.append(Track(self.tracking_method,self.cur_id,det,frame_gray,use_kalman = self.use_kalman,measurement_noise = self.measurement_noise,process_noise = self.process_noise, embed_alpha = self.embed_alpha))
                     self.cur_id+=1
 
         self.frameCount+=1
@@ -195,10 +195,10 @@ class Tracker(object):
     def get_display_tracks(self):
         
     
-        
+       
         self.tracks = [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_life]
         
-        res =  [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_visibility]
+        res =  [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_visibility ]
         
         return res
         

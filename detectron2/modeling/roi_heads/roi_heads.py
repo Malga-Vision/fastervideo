@@ -689,7 +689,7 @@ class StandardROIHeads(ROIHeads):
             #print(labels)
             #print(pairs_used)
             if(box_features.shape[0] != len(mod_labels) or box_features.shape[0]==0):
-                print('that is very weird!!!!')
+                print('Debug Message:Incorrect dimensions of boxes and labels during Joint Training!!!!')
                 print(props)
                 print(labels)
             #print(mod_labels)
@@ -744,8 +744,9 @@ class StandardROIHeads(ROIHeads):
         features = [features[f] for f in self.in_features]
         #print(instances)
         box_features = self.box_pooler(features, [instances.proposal_boxes])
-        
-        return box_features
+        #box_features_pooled = self.box_head(box_features)
+        box_embeddings = self.reid_head(box_features)
+        return box_features,box_embeddings
         #instances = self._forward_mask(features, instances)
         #instances = self._forward_keypoint(features, instances)
         #return instances

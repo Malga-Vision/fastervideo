@@ -36,18 +36,8 @@ class SoftTracker(object):
         for itrack in range(len(tracks)):
             for ipred in range(len(dets)):
                 desc_dist=0
-                if(self.use_appearance==True):
-                    
-                    if(self.embed==True or self.reid==True):
-                        if(self.dist=='cosine'):
-                            desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
-                           
-                        else:
-                            desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
-                       
-                    else:
-                        
-                        desc_dist = np.linalg.norm(dets[ipred].hog-tracks[itrack].hog, ord=1)/self.dist_thresh
+                
+                
                        
                         
                 
@@ -67,14 +57,19 @@ class SoftTracker(object):
         for itrack in range(len(tracks)):
             for ipred in range(len(dets)):
                 desc_dist=0
+                giou_overlap,iou_overlap = g_iou(dets[ipred].corners(),tracks[itrack].corners())
                 if(self.use_appearance==True):
                     
                     if(self.embed==True or self.reid==True):
-                        if(self.dist=='cosine'):
-                            desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
-                           
+                        if(giou_overlap < self.giou_cutoff):
+                            
+                            desc_dist = 999
                         else:
-                            desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
+                            if(self.dist=='cosine'):
+                                desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
+                           
+                            else:
+                                desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
                        
                     else:
                         
@@ -151,7 +146,7 @@ class SoftTracker(object):
                 limit = 1.2
                 if(self.use_appearance==True):
                     limit  =1.2
-                if(dists[det_indices[ri],track_indices[ri]]>limit):
+                if(dists[rval,track_indices[ri]]>limit):
                  
                       
                   det_indices[ri] = -1
@@ -171,13 +166,13 @@ class SoftTracker(object):
                     
                     
                     trk.is_overlap = False
-                    if(self.use_overlap):
-                        for others in self.tracks:
-                            if(trk.track_id==others.track_id):
-                                continue
-                            if(ios(trk.corners(),others.corners())>=self.overlap_threshold):
-                                trk.is_overlap = True
-                                break
+                    #if(self.use_overlap):
+                        #for others in self.tracks:
+                            #if(trk.track_id==others.track_id):
+                                #continue
+                            #if(ios(trk.corners(),others.corners())>=self.overlap_threshold):
+                                #trk.is_overlap = True
+                                #break
                     
                     det_index = np.where(track_indices==t)[0][0]
                     dist_min_iou = dists_iou[det_index,t]

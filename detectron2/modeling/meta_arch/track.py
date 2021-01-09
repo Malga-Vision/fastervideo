@@ -4,7 +4,7 @@ from .detection import *
 from .utils import *
 import math
 class Track(Detection):
-    def __init__(self,method,_id,det,frame_gray,conf=0,major_color=[],process_noise=1,measurement_noise=1,embed_alpha = 0.5):
+    def __init__(self,method,_id,det,frame_gray,use_kalman=True,conf=0,major_color=[],process_noise=1,measurement_noise=1,embed_alpha = 0.5):
         
         self.conf = conf
         self.xmin = det.xmin
@@ -25,6 +25,7 @@ class Track(Detection):
         self.embed_alpha = embed_alpha
         self.occluded = False
         self.missed_count=0
+        self.use_kalman = use_kalman
         self.matched=True
         self.descriptor = np.array(np.zeros(det.descriptor.shape[0],np.float32))
         self.descriptor[:] = det.descriptor[:]
@@ -68,8 +69,8 @@ class Track(Detection):
                                                         [0,0,0,0,0,0,0,1]],np.float32)*process_noise
 
         self.kalman_tracker.predict();
-
         self.kalman_tracker.correct(self.corners())
+        self.kalman_tracker.correct(convert_bbox_to_z(self.corners()))
         
     def init_kalman_tracker_acc(self,measurement_noise,process_noise):
         self.kalman_tracker = cv.KalmanFilter(12,4)
@@ -111,8 +112,8 @@ class Track(Detection):
                                                         
 
         self.kalman_tracker.predict();
-
         self.kalman_tracker.correct(self.corners())
+        #self.kalman_tracker.correct(convert_bbox_to_z(self.corners()))
         
     
     def copy(self):
@@ -143,9 +144,10 @@ class Track(Detection):
         if(self.method=='kalman_acc' or self.method=='kalman_vel' ):
             self.predict(prev_frame_gray,frame_gray)
             pred = self.kalman_tracker.predict()
+            #self.kalman_tracker.correct(convert_bbox_to_z(det.corners()))
             self.kalman_tracker.correct(det.corners())
-         
-            if(self.tracked_count>15):
+            
+            if(self.use_kalman and self.tracked_count>15):
                 self.xmin = self.pred_xmin
                 self.ymin = self.pred_ymin
                 self.xmax=self.pred_xmax
@@ -190,6 +192,11 @@ class Track(Detection):
     def predict(self,prev_frame_gray,frame_gray):
         if(self.method=='kalman_vel' or self.method=='kalman_acc'):
             pred = self.kalman_tracker.predict()
+            
+            #pred = pred.reshape(1,8)[0]
+            #pred_box = convert_x_to_bbox(pred[0:4])
+            
+            #print(pred_box)
             self.pred_xmin = pred[0][0]
             self.pred_ymin = pred[1][0]
             self.pred_xmax = pred[2][0]

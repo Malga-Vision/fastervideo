@@ -36,7 +36,11 @@ class Detection(object):
         other = Detection(self.conf,[self.xmin,self.ymin,self.xmax,self.ymax],self.pred_class)
         return other
     def area(self):
-        return (self.xmax-self.xmin)*(self.ymax-self.ymin)
+        return self.width()*self.height()
     def __repr__(self):
         return "xmin: %f, ymin:%f, xmax:%f, ymax:%f, conf:%f, class:%d"%(self.xmin,self.ymin,self.xmax,self.ymax,self.conf,self.pred_class)
+    def width(self):
+        return (self.xmax-self.xmin)
+    def height(self):
+        return  (self.ymax-self.ymin)
   
