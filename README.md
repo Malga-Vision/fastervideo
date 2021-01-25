@@ -14,6 +14,7 @@ Using Faster R-CNN and an additional Embeddings head (trained using triplet loss
 - OpenCV
 - [fvcore](https://github.com/facebookresearch/fvcore/): `pip install 'git+https://github.com/facebookresearch/fvcore'`
 - pycocotools: `pip install cython; pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'`
+- Basic libraries: (Numpy, Scikit-learn, Scikit-image, tqdm, 
 - GCC >= 4.9
 - Motmetrics: `pip install motmetrics`
 - Jupyter notebook to run the notebooks
