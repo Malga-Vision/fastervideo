@@ -34,7 +34,7 @@ weights of trained models can be found on this [link](https://unigeit-my.sharepo
 ### KITTI
 |Method|MOTA|MOTP|P|R|IDs|FPS|
 |---|---|---|---|---|----|----|
-|FasterVideo|79.3|78.6|94.6|87.5|287|8.8|
+|FasterVideo|81.2|78.6|96.2|87.5|244|13.4|
 |Tracktor++|80.2|82.1|97.9|84.4|68|2.8|
 |MOTBP|84.2|85.7|98|90.5|293|1.6*|
 |TuSimple|86.6|84|97.9|88.8|468|3.3*|
