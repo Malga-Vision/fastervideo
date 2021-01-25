@@ -132,7 +132,7 @@ class Track(Detection):
         self.matched = True
         self.missed_count = 0
         self.tracked_count +=1
-        
+        self.conf = det.conf
         self.old_center = self.center()
         if(len(det.major_color)>0 and len(self.major_color)>0):
             self.major_color[0] = (det.major_color[0]+4*self.major_color[0])/5
@@ -166,14 +166,18 @@ class Track(Detection):
         self.predict(prev_frame_gray,frame_gray)
         
         
-        
+        if(self.missed_count>0):
+            self.conf = self.conf - self.missed_count *0.3
+            if(self.conf<0):
+                self.conf = 0
         
         
         if(self.tracked_count>5):
-            self.xmin = self.pred_xmin
-            self.ymin = self.pred_ymin
-            self.xmax = self.pred_xmax
-            self.ymax = self.pred_ymax
+            
+            self.xmin = np.minimum(self.pred_xmin,self.pred_xmax)
+            self.ymin = np.minimum(self.pred_ymin,self.pred_ymax)
+            self.xmax = np.maximum(self.pred_xmin,self.pred_xmax)
+            self.ymax = np.maximum(self.pred_ymin,self.pred_ymax)
         elif(self.missed_count>0 and self.missed_count<3):
             self.xmin = self.pred_xmin
             self.ymin = self.pred_ymin

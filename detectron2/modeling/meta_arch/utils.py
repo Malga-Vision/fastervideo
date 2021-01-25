@@ -4,6 +4,7 @@ import cv2 as cv2
 from scipy.spatial import distance
 from skimage.feature import hog
 import scipy.interpolate as interp
+import math
 
 def get_overlap_to_self(a,b):
     if(int(a.xmin)==int(b.xmin) and int(a.ymin)==int(b.ymin) and int(a.xmax)==int(b.xmax) and int(a.ymax)==int(b.ymax)):
@@ -309,3 +310,20 @@ def mod_iou(a,b):
 		#print(1-iou(a,b_copy))
 		return -(1- iou(a,b_copy))
 	return iou_org
+def euc_box_dist(a,b):
+	x_side =0
+	y_side = 0
+
+	#x side
+	if(a[2]<b[0]):
+		x_side = b[0] - a[2]
+	elif(a[0]>b[2]):
+		x_side =b[2]-a[0]
+
+	
+	#yside
+	if(a[3]<b[1]):
+		y_side += b[1] - a[3]
+	elif(a[1]>b[3]):
+		y_side +=b[3]-a[1]
+	return math.sqrt((x_side*x_side) + (y_side*y_side))

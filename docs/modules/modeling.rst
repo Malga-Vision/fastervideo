@@ -1,4 +1,4 @@
-detectron2.modeling package
+detectron2.modeling 
 ===========================
 
 .. automodule:: detectron2.modeling
@@ -7,7 +7,7 @@ detectron2.modeling package
     :show-inheritance:
 
 
-detectron2.modeilng.poolers module
+detectron2.modeling.poolers module
 ---------------------------------------
 
 .. automodule:: detectron2.modeling.poolers
@@ -16,7 +16,7 @@ detectron2.modeilng.poolers module
     :show-inheritance:
 
 
-detectron2.modeilng.sampling module
+detectron2.modeling.sampling module
 ------------------------------------
 
 .. automodule:: detectron2.modeling.sampling
@@ -25,7 +25,7 @@ detectron2.modeilng.sampling module
     :show-inheritance:
 
 
-detectron2.modeilng.box_regression module
+detectron2.modeling.box_regression module
 ------------------------------------------
 
 .. automodule:: detectron2.modeling.box_regression
@@ -50,6 +50,8 @@ and register your component to that registry.
 .. autodata:: detectron2.modeling.META_ARCH_REGISTRY
 .. autodata:: detectron2.modeling.BACKBONE_REGISTRY
 .. autodata:: detectron2.modeling.PROPOSAL_GENERATOR_REGISTRY
+.. autodata:: detectron2.modeling.RPN_HEAD_REGISTRY
+.. autodata:: detectron2.modeling.ANCHOR_GENERATOR_REGISTRY
 .. autodata:: detectron2.modeling.ROI_HEADS_REGISTRY
 .. autodata:: detectron2.modeling.ROI_BOX_HEAD_REGISTRY
 .. autodata:: detectron2.modeling.ROI_MASK_HEAD_REGISTRY

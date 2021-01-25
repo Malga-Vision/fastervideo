@@ -30,6 +30,7 @@ class Tracker(object):
         self.distances = []
         self.sups = []
         self.tots = []
+        self.gious = []
     def get_distance_matrix(self,dets,tracks,frame):
         sup_count=0
         dists = np.zeros((len(dets),len(tracks)),np.float32)
@@ -37,17 +38,23 @@ class Tracker(object):
             for ipred in range(len(dets)):
                 desc_dist=0
                 
-                iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
-                
+                giou_overlap , iou_overlap = g_iou(dets[ipred].corners(),tracks[itrack].corners())
+                #center_dist = np.linalg.norm(dets[ipred].center()-tracks[itrack].center(), ord=2)
+                #if(iou_overlap==0):
+                    #self.gious.append(euc_box_dist(dets[ipred].corners(),tracks[itrack].corners())      )
                 if(self.use_appearance==True):
                     
                     if(self.embed==True or self.reid==True):
-                        
-                        if(self.dist=='cosine'):
-                            desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)
-                            
+                        if(iou_overlap ==0):
+                            dist_ = euc_box_dist(dets[ipred].corners(),tracks[itrack].corners())                           
+                        if(iou_overlap ==0 and dist_ > self.giou_cutoff):
+                            desc_dist = 999
                         else:
-                            desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
+                            if(self.dist=='cosine'):
+                                desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)
+                            
+                            else:
+                                desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
 
                     else:
                         
@@ -195,7 +202,15 @@ class Tracker(object):
     def get_display_tracks(self):
         
     
-       
+        for trk in self.tracks:
+            if(trk.xmin >trk.xmax):
+                temp = trk.xmin
+                trk.xmin  =trk.xmax
+                trk.xmax = temp
+            if(trk.ymin>trk.ymax):
+                temp = trk.ymin
+                trk.zymin  =trk.ymax
+                trk.ymax = temp
         self.tracks = [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_life]
         
         res =  [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_visibility ]
