@@ -1,64 +1,42 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-class Registry(object):
+# Copyright (c) Facebook, Inc. and its affiliates.
+
+from typing import Any
+import pydoc
+from fvcore.common.registry import Registry  # for backward compatibility.
+
+"""
+``Registry`` and `locate` provide ways to map a string (typically found
+in config files) to callable objects.
+"""
+
+__all__ = ["Registry", "locate"]
+
+
+def _convert_target_to_string(t: Any) -> Any:
     """
-    The registry that provides name -> object mapping, to support third-party users' custom modules.
-
-    To create a registry (inside detectron2):
-
-    .. code-block:: python
-
-        BACKBONE_REGISTRY = Registry('BACKBONE')
-
-    To register an object:
-
-    .. code-block:: python
-
-        @BACKBONE_REGISTRY.register()
-        class MyBackbone():
-            ...
-
-    Or:
-
-    .. code-block:: python
-
-        BACKBONE_REGISTRY.register(MyBackbone)
+    Inverse of ``locate()``.
     """
+    return f"{t.__module__}.{t.__qualname__}"
 
-    def __init__(self, name):
-        """
-        Args:
-            name (str): the name of this registry
-        """
-        self._name = name
 
-        self._obj_map = {}
+def locate(name: str) -> Any:
+    """
+    Locate and return an object ``x`` using an input string ``{x.__module__}.{x.__qualname__}``,
+    such as "module.submodule.class_name".
 
-    def _do_register(self, name, obj):
-        assert (
-            name not in self._obj_map
-        ), "An object named '{}' was already registered in '{}' registry!".format(name, self._name)
-        self._obj_map[name] = obj
+    Raise Exception if it cannot be found.
+    """
+    obj = pydoc.locate(name)
 
-    def register(self, obj=None):
-        """
-        Register the given object under the the name `obj.__name__`.
-        Can be used as either a decorator or not. See docstring of this class for usage.
-        """
-        if obj is None:
-            # used as a decorator
-            def deco(func_or_class):
-                name = func_or_class.__name__
-                self._do_register(name, func_or_class)
-                return func_or_class
+    # Some cases (e.g. torch.optim.sgd.SGD) not handled correctly
+    # by pydoc.locate. Try a private function from hydra.
+    # Should use _locate directly if it's public.
+    if obj is None:
+        try:
+            from hydra._internal.utils import _locate
+        except ImportError as e:
+            raise ImportError(f"Cannot dynamically locate object {name}!") from e
+        else:
+            obj = _locate(name)  # it raises if fails
 
-            return deco
-
-        # used as a function call
-        name = obj.__name__
-        self._do_register(name, obj)
-
-    def get(self, name):
-        ret = self._obj_map.get(name)
-        if ret is None:
-            raise KeyError("No object named '{}' found in '{}' registry!".format(name, self._name))
-        return ret
+    return obj

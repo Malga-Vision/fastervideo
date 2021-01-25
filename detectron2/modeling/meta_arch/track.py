@@ -17,13 +17,12 @@ class Track(Detection):
         self.pred_xmax = det.xmax
         self.pred_ymax = det.ymax
         self.tracked_count = 1
-        self.hog = det.hog
+        
         self.frame_gray = frame_gray
-        self.old_center = []
-        self.old_slope = 0
-        self.major_color=major_color
+        
+       
         self.embed_alpha = embed_alpha
-        self.occluded = False
+       
         self.missed_count=0
         self.use_kalman = use_kalman
         self.matched=True

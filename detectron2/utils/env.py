@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# Copyright (c) Facebook, Inc. and its affiliates.
 import importlib
 import importlib.util
 import logging
@@ -10,6 +10,12 @@ from datetime import datetime
 import torch
 
 __all__ = ["seed_all_rng"]
+
+
+TORCH_VERSION = tuple(int(x) for x in torch.__version__.split(".")[:2])
+"""
+PyTorch version as a tuple of 2 ints. Useful for comparison.
+"""
 
 
 def seed_all_rng(seed=None):
@@ -28,7 +34,7 @@ def seed_all_rng(seed=None):
         logger = logging.getLogger(__name__)
         logger.info("Using a generated random seed {}".format(seed))
     np.random.seed(seed)
-    torch.set_rng_state(torch.manual_seed(seed).get_state())
+    torch.manual_seed(seed)
     random.seed(seed)
 
 
@@ -60,8 +66,22 @@ def _configure_libraries():
 
             if int(cv2.__version__.split(".")[0]) >= 3:
                 cv2.ocl.setUseOpenCL(False)
-        except ImportError:
+        except ModuleNotFoundError:
+            # Other types of ImportError, if happened, should not be ignored.
+            # Because a failed opencv import could mess up address space
+            # https://github.com/skvark/opencv-python/issues/381
             pass
+
+    def get_version(module, digit=2):
+        return tuple(map(int, module.__version__.split(".")[:digit]))
+
+    # fmt: off
+    assert get_version(torch) >= (1, 4), "Requires torch>=1.4"
+    import fvcore
+    assert get_version(fvcore, 3) >= (0, 1, 2), "Requires fvcore>=0.1.2"
+    import yaml
+    assert get_version(yaml) >= (5, 1), "Requires pyyaml>=5.1"
+    # fmt: on
 
 
 _ENV_SETUP_DONE = False

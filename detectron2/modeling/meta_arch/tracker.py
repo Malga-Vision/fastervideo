@@ -24,13 +24,8 @@ class Tracker(object):
         self.tracks = []
         self.cur_id=1
         self.frameCount =0
-        self.history_window = 3
-        self.detect_interval=3
         self.track_len = 10
-        self.distances = []
-        self.sups = []
-        self.tots = []
-        self.gious = []
+  
     def get_distance_matrix(self,dets,tracks,frame):
         sup_count=0
         dists = np.zeros((len(dets),len(tracks)),np.float32)
@@ -38,33 +33,18 @@ class Tracker(object):
             for ipred in range(len(dets)):
                 desc_dist=0
                 
-                giou_overlap , iou_overlap = g_iou(dets[ipred].corners(),tracks[itrack].corners())
-                #center_dist = np.linalg.norm(dets[ipred].center()-tracks[itrack].center(), ord=2)
-                #if(iou_overlap==0):
-                    #self.gious.append(euc_box_dist(dets[ipred].corners(),tracks[itrack].corners())      )
+                iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
+                
                 if(self.use_appearance==True):
                     
                     if(self.embed==True or self.reid==True):
-                        if(iou_overlap ==0):
-                            dist_ = euc_box_dist(dets[ipred].corners(),tracks[itrack].corners())                           
-                        if(iou_overlap ==0 and dist_ > self.giou_cutoff):
-                            desc_dist = 999
-                        else:
-                            if(self.dist=='cosine'):
-                                desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)
+                        
+                        if(self.dist=='cosine'):
+                            desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)
                             
-                            else:
-                                desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
+                        else:
+                            desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
 
-                    else:
-                        
-                        desc_dist = np.linalg.norm(dets[ipred].hog-tracks[itrack].hog, ord=1)/self.dist_thresh
-                       
-                        
-                
-                
-                
-                
                 iou_dist = 1-iou_overlap
                 
                 total_dist =  desc_dist + iou_dist
@@ -103,18 +83,11 @@ class Tracker(object):
             ymin = dets_tensor.pred_boxes[int(i)].tensor[0,1].numpy()
             xmax = dets_tensor.pred_boxes[int(i)].tensor[0,2].numpy()
             ymax = dets_tensor.pred_boxes[int(i)].tensor[0,3].numpy()
-            if(self.use_appearance==True and  self.hog ==False):
-                dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i].numpy().ravel()))
-            else:
-                dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),np.array([])))
             
+            dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i].numpy().ravel()))
+           
                 
-            if(self.use_appearance==True and self.hog==True):
-                dets[i].calc_hog_descriptor(frame_gray,self.hog_num_cells)
-                dets[i].calc_major_color(cur)
-            else:
-                dets[i].hog=None
-            
+           
         list_classes = [d.pred_class for d in dets]
         list_classes_tracks = [d.pred_class for d in self.tracks]
         list_classes = list(set(list_classes).union(set(list_classes_tracks)))

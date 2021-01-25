@@ -23,14 +23,8 @@ class SoftTracker(object):
         
         self.tracks = []
         self.cur_id=1
-        self.frameCount =1
-        self.detect_interval=3
+        self.frameCount =0
         self.track_len = 10
-        self.distances = []
-        self.cand_det = []
-        self.feature_params=dict(maxCorners=200,qualityLevel=0.3,minDistance=7,blockSize=7)
-        self.lk_params=dict(winSize=(15,15),maxLevel=2,criteria=(cv.TERM_CRITERIA_EPS|cv.TERM_CRITERIA_COUNT,10,0.03))
-        self.flow_time=0
     def get_iou_distance_matrix(self,dets,tracks,frame):
         dists = np.zeros((len(dets),len(tracks)),np.float32)
         for itrack in range(len(tracks)):
@@ -44,55 +38,45 @@ class SoftTracker(object):
                 iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
                 iou_dist = 1-iou_overlap
                 
-                self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
-                
                 total_dist = iou_dist 
             
                 dists[ipred,itrack] = total_dist
                 
         return dists
     def get_distance_matrix(self,dets,tracks,frame):
-        
+        sup_count=0
         dists = np.zeros((len(dets),len(tracks)),np.float32)
         for itrack in range(len(tracks)):
             for ipred in range(len(dets)):
                 desc_dist=0
-                giou_overlap,iou_overlap = g_iou(dets[ipred].corners(),tracks[itrack].corners())
+                
+                iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
+                
                 if(self.use_appearance==True):
                     
                     if(self.embed==True or self.reid==True):
-                        if(giou_overlap < self.giou_cutoff):
+                        
+                        if(self.dist=='cosine'):
+                            desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)
                             
-                            desc_dist = 999
                         else:
-                            if(self.dist=='cosine'):
-                                desc_dist = distance.cosine(dets[ipred].descriptor,tracks[itrack].descriptor)/self.dist_thresh
-                           
-                            else:
-                                desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
-                       
-                    else:
-                        
-                        desc_dist = np.linalg.norm(dets[ipred].hog-tracks[itrack].hog, ord=1)/self.dist_thresh
-                       
-                        
-                iou_overlap = iou(dets[ipred].corners(),tracks[itrack].corners())
+                            desc_dist = np.linalg.norm(dets[ipred].descriptor-tracks[itrack].descriptor, ord=2)/self.dist_thresh
+
                 iou_dist = 1-iou_overlap
                 
-                self.distances.append([self.frameCount,dets[ipred].pred_class,tracks[itrack].pred_class,desc_dist,iou_dist,dets[ipred].corners(),tracks[itrack].corners()])
-                
-                total_dist = iou_dist +desc_dist
+                total_dist =  desc_dist + iou_dist
             
                 dists[ipred,itrack] = total_dist
-            
+      
         return dists
     def get_predicted_tracks(self,frame_gray,prev_gray,scale_x,scale_y):
         adds = []
         for t,trk in enumerate(self.tracks):
             if(self.use_kalman==True):
-                if(trk.tracked_count>5):
-                    
-                    trk.apply_prediction(None,None)
+                #if(trk.tracked_count>5):
+
+                trk.apply_prediction(None,None)
+                
             
             adds.append([trk.conf,trk.xmin,trk.ymin,trk.xmax,trk.ymax])
         return adds
@@ -115,19 +99,8 @@ class SoftTracker(object):
             ymin = dets_tensor.pred_boxes[int(i)].tensor[0,1].numpy()
             xmax = dets_tensor.pred_boxes[int(i)].tensor[0,2].numpy()
             ymax = dets_tensor.pred_boxes[int(i)].tensor[0,3].numpy()
-            if(self.use_appearance==True and  self.hog ==False):
-                dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i].numpy().ravel()))
-            else:
-                dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),np.array([])))
+            dets.append(Detection(float(np.array((dets_tensor.scores[int(i)]),ndmin=1)[0]),[xmin,ymin,xmax,ymax],int(np.array(dets_tensor.pred_classes[int(i)],ndmin=1)),descs_tensor[i].numpy().ravel()))
             
-                
-            
-                
-            if(self.use_appearance==True and self.hog==True):
-                dets[i].calc_hog_descriptor(frame_gray,self.hog_num_cells)
-                dets[i].calc_major_color(cur)
-            else:
-                dets[i].hog=None
             
         list_classes = [d.pred_class for d in dets]
         list_classes_tracks = [d.pred_class for d in self.tracks]
@@ -189,7 +162,7 @@ class SoftTracker(object):
                             global_used_dets.append(c_id)
                     if(len(candidate_detections)>0):
                        
-                        self.cand_det.append(len(candidate_detections))
+                        
                         avg_conf = np.average([dets_class[c_id].conf for c_id in candidate_detections], weights = weights)
                         avg_descriptor = np.average([dets_class[c_id].descriptor for c_id in candidate_detections],axis=0,weights = weights)
                         avg_xmin = np.average([dets_class[c_id].xmin for c_id in candidate_detections],weights = weights)
@@ -220,14 +193,23 @@ class SoftTracker(object):
     def get_display_tracks(self):
         
     
-        
+        for trk in self.tracks:
+            if(trk.xmin >trk.xmax):
+                temp = trk.xmin
+                trk.xmin  =trk.xmax
+                trk.xmax = temp
+            if(trk.ymin>trk.ymax):
+                temp = trk.ymin
+                trk.zymin  =trk.ymax
+                trk.ymax = temp
         self.tracks = [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_life]
-
-        res =  [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_visibility]
+        
+        res =  [track for track in self.tracks if track.conf>=0 and track.missed_count<self.track_visibility ]
         
         return res
         
         
    
        
+
 
