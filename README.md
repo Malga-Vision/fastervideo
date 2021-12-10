@@ -4,7 +4,7 @@ https://github.com/facebookresearch/detectron2
 
 This code performs joint detection and tracking for object tracking tasks.
 Using Faster R-CNN and an additional Embeddings head (trained using triplet loss) the method is trained and tested on several datasets and benchmarks (KITTI, MOT17, MOT20)
-
+## Author: Issa Mouawad
 ### Requirements
 - Linux or macOS
 - Python >= 3.6 [preferably a conda environment]
